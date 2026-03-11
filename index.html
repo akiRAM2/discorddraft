@@ -108,15 +108,31 @@
 
     /* === Input panel === */
     .panel-input {
-      width: 42%;
+      flex: 0 0 var(--input-panel-width, 42%);
       min-width: 280px;
-      max-width: 520px;
       background: var(--bg-secondary);
-      border-right: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
+
+    .col-resizer {
+      width: 6px;
+      background: var(--border);
+      cursor: col-resize;
+      flex: 0 0 6px;
+      position: relative;
+    }
+    .col-resizer::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.06);
+      opacity: 0;
+      transition: opacity .12s;
+    }
+    .col-resizer:hover::after { opacity: 1; }
+    body.resizing { cursor: col-resize; user-select: none; }
     .panel-input-header {
       padding: 10px 12px;
       border-bottom: 1px solid var(--border);
@@ -261,10 +277,12 @@
       font-size: 14px;
       line-height: 1.375;
       min-height: 72px;
+      max-height: 40vh;
       outline: none;
       padding: 7px 9px;
-      resize: vertical;
+      resize: none;
       width: 100%;
+      overflow-y: auto;
     }
     .msg-textarea:focus { border-color: var(--brand); }
 
@@ -646,7 +664,8 @@
       html, body { overflow: auto; }
       #app { height: auto; min-height: 100%; }
       #tab-preview { flex-direction: column; }
-      .panel-input { width: 100%; max-width: 100%; min-width: 0; border-right: none; border-bottom: 1px solid var(--border); max-height: 55vh; }
+      .col-resizer { display: none; }
+      .panel-input { flex: 0 0 auto; width: 100%; min-width: 0; border-bottom: 1px solid var(--border); max-height: 55vh; }
       .panel-preview { min-height: 300px; }
       .tab-content.active { flex-direction: column; }
     }
@@ -695,6 +714,8 @@
       <button class="add-message-btn" id="add-message-btn" data-i18n="addMessage">＋ メッセージを追加</button>
       <div class="message-list" id="message-list"></div>
     </div>
+
+    <div class="col-resizer" id="col-resizer" role="separator" aria-orientation="vertical" aria-label="Resize columns"></div>
 
     <!-- Right: preview panel -->
     <div class="panel-preview">
@@ -887,6 +908,94 @@ function escHtml(s) {
     .replace(/'/g,'&#39;');
 }
 function escAttr(s) { return escHtml(s); }
+
+function clamp(n, min, max) { return Math.min(max, Math.max(min, n)); }
+
+function autoGrowTextarea(ta) {
+  if (!ta) return;
+  ta.style.height = 'auto';
+  ta.style.height = `${ta.scrollHeight}px`;
+}
+
+function initColumnResizer() {
+  const container = document.getElementById('tab-preview');
+  const left = container ? container.querySelector('.panel-input') : null;
+  const resizer = document.getElementById('col-resizer');
+  if (!container || !left || !resizer) return;
+
+  const mq = window.matchMedia('(max-width: 680px)');
+  const key = 'discorddraft:inputPanelWidthPx';
+
+  const getBounds = () => {
+    const total = container.getBoundingClientRect().width;
+    const resizerW = resizer.getBoundingClientRect().width || 6;
+    const minLeft = 280;
+    const minRight = 320;
+    const maxLeft = Math.max(minLeft, total - minRight - resizerW);
+    return { minLeft, maxLeft };
+  };
+
+  const setLeftPx = (px) => {
+    const { minLeft, maxLeft } = getBounds();
+    const clamped = clamp(Math.round(px), minLeft, maxLeft);
+    container.style.setProperty('--input-panel-width', `${clamped}px`);
+    return clamped;
+  };
+
+  const applySaved = () => {
+    const raw = localStorage.getItem(key);
+    const px = parseInt(raw || '', 10);
+    if (!Number.isFinite(px) || px <= 0) return;
+    setLeftPx(px);
+  };
+
+  applySaved();
+
+  resizer.addEventListener('pointerdown', (e) => {
+    if (mq.matches) return;
+    if (e.button !== 0) return;
+    e.preventDefault();
+
+    const startX = e.clientX;
+    const startW = left.getBoundingClientRect().width;
+    document.body.classList.add('resizing');
+    resizer.setPointerCapture(e.pointerId);
+
+    const onMove = (ev) => {
+      const dx = ev.clientX - startX;
+      setLeftPx(startW + dx);
+    };
+    const onUp = () => {
+      document.body.classList.remove('resizing');
+      resizer.removeEventListener('pointermove', onMove);
+      resizer.removeEventListener('pointerup', onUp);
+      resizer.removeEventListener('pointercancel', onUp);
+      const w = left.getBoundingClientRect().width;
+      localStorage.setItem(key, String(Math.round(w)));
+    };
+
+    resizer.addEventListener('pointermove', onMove);
+    resizer.addEventListener('pointerup', onUp);
+    resizer.addEventListener('pointercancel', onUp);
+  });
+
+  // Keyboard resize when focused (optional, but helps accessibility).
+  resizer.tabIndex = 0;
+  resizer.addEventListener('keydown', (e) => {
+    if (mq.matches) return;
+    const step = e.shiftKey ? 40 : 20;
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const cur = left.getBoundingClientRect().width;
+    const next = setLeftPx(cur + (e.key === 'ArrowRight' ? step : -step));
+    localStorage.setItem(key, String(next));
+  });
+
+  window.addEventListener('resize', () => {
+    if (mq.matches) return;
+    applySaved();
+  });
+}
 
 function formatMsgTime() {
   const now = new Date();
@@ -1341,9 +1450,11 @@ function renderEditors() {
       msg.color = e.target.value;
       renderPreview();
     });
-    div.querySelector('.msg-textarea').addEventListener('input', e => {
+    const ta = div.querySelector('.msg-textarea');
+    ta.addEventListener('input', e => {
       msg.text = e.target.value;
       updateCounter(div, msg);
+      autoGrowTextarea(e.target);
       renderPreview();
     });
     div.querySelector('.plan-select').addEventListener('change', e => {
@@ -1356,6 +1467,8 @@ function renderEditors() {
     div.querySelector('[data-action=del]').addEventListener('click', () => removeMessage(msg.id));
 
     list.appendChild(div);
+    // After insertion, measure with correct width and grow.
+    requestAnimationFrame(() => autoGrowTextarea(ta));
   });
 }
 
@@ -1623,6 +1736,7 @@ document.getElementById('lang-btn').addEventListener('click', () => {
 });
 
 // ---- Init ----
+initColumnResizer();
 addMessage();
 initTimestampTool();
 updateChannelHeader();
