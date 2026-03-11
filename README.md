@@ -63,5 +63,4 @@ Settings → Pages → Source: **GitHub Actions** に設定してください。
 
 ## ライセンス
 
-- このリポジトリのライセンスは現在未設定です（必要なら `LICENSE` を追加してください）。
 - 本ツールは Prism.js を同梱しています: MIT
