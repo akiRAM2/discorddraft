@@ -1079,13 +1079,24 @@ function parseInline(text, suppressedOgpUrls, ogpUrls) {
     protect(renderDiscordTimestamp(parseInt(ts), fmt || 'f'))
   );
 
-  // 3. <URL> suppress-OGP links
+  // 3. Markdown links: [text](url) / [text](<url>)
+  // Note: Discord doesn't support masked links in normal messages, but this tool does.
+  text = text.replace(/\[([^\]\n]+)\]\(\s*(<)?(https?:\/\/[^\s>]+)(?:>)?\s*\)/g, (_, label, angle, url) => {
+    const suppress = !!angle;
+    if (suppress) suppressedOgpUrls.add(url);
+    else ogpUrls.push(url);
+    const cls = suppress ? 'dc-link' : 'dc-link ogp-trigger';
+    const data = suppress ? '' : ` data-url="${escAttr(url)}"`;
+    return protect(`<a class="${cls}" href="${escAttr(url)}" target="_blank" rel="noopener noreferrer"${data}>${escHtml(label)}</a>`);
+  });
+
+  // 4. <URL> suppress-OGP links
   text = text.replace(/<(https?:\/\/[^\s>]+)>/g, (_, url) => {
     suppressedOgpUrls.add(url);
     return protect(`<a class="dc-link" href="${escAttr(url)}" target="_blank" rel="noopener noreferrer">${escHtml(url)}</a>`);
   });
 
-  // 4. Plain URLs (collect for OGP)
+  // 5. Plain URLs (collect for OGP)
   text = text.replace(/https?:\/\/[^\s<>"'`]+/g, (url) => {
     // trim trailing punctuation
     url = url.replace(/[.,;!?)]+$/, '');
@@ -1093,39 +1104,39 @@ function parseInline(text, suppressedOgpUrls, ogpUrls) {
     return protect(`<a class="dc-link ogp-trigger" href="${escAttr(url)}" target="_blank" rel="noopener noreferrer" data-url="${escAttr(url)}">${escHtml(url)}</a>`);
   });
 
-  // 5. Escape remaining HTML
+  // 6. Escape remaining HTML
   text = escHtml(text);
 
-  // 6. Spoiler
+  // 7. Spoiler
   text = text.replace(/\|\|(.+?)\|\|/gs, (_, c) =>
     protect(`<span class="dc-spoiler" onclick="this.classList.toggle('revealed')">${c}</span>`)
   );
 
-  // 7. Bold+Italic
+  // 8. Bold+Italic
   text = text.replace(/\*\*\*(.+?)\*\*\*/gs, (_, c) => protect(`<strong><em>${c}</em></strong>`));
 
-  // 8. Bold
+  // 9. Bold
   text = text.replace(/\*\*(.+?)\*\*/gs, (_, c) => protect(`<strong>${c}</strong>`));
 
-  // 9. Underline+Italic
+  // 10. Underline+Italic
   text = text.replace(/___(.+?)___/gs, (_, c) => protect(`<u><em>${c}</em></u>`));
 
-  // 10. Underline
+  // 11. Underline
   text = text.replace(/__(.+?)__/gs, (_, c) => protect(`<u>${c}</u>`));
 
-  // 11. Italic *
+  // 12. Italic *
   text = text.replace(/\*([^*\n]+)\*/g, (_, c) => protect(`<em>${c}</em>`));
 
-  // 12. Italic _ (word boundary)
+  // 13. Italic _ (word boundary)
   text = text.replace(/(?<![\\w])_([^_\n]+)_(?![\\w])/g, (_, c) => protect(`<em>${c}</em>`));
 
-  // 13. Strikethrough
+  // 14. Strikethrough
   text = text.replace(/~~(.+?)~~/gs, (_, c) => protect(`<s>${c}</s>`));
 
-  // 14. @mentions
+  // 15. @mentions
   text = text.replace(/@(\w+)/g, (_, n) => protect(`<span class="dc-mention">@${n}</span>`));
 
-  // 15. #channels
+  // 16. #channels
   text = text.replace(/#([\w-]+)/g, (_, n) => protect(`<span class="dc-channel-mention">#${n}</span>`));
 
   // Restore tokens
