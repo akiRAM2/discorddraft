@@ -1574,7 +1574,9 @@ function parseMarkdown(text) {
 
   return {
     html,
-    ogpUrls: allOgpUrls.filter(u => !suppressedOgpUrls.has(u)),
+    // Only URLs that were collected as "OGP-enabled" links are included.
+    // This allows mixing the same URL as both OGP-enabled and OGP-suppressed in one message.
+    ogpUrls: Array.from(new Set(allOgpUrls)),
   };
 }
 
