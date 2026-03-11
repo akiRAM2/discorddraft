@@ -267,6 +267,7 @@
     }
     .msg-ctrl-btn:hover { color: var(--text-normal); background: var(--bg-hover); }
     .msg-ctrl-btn.del:hover { color: var(--red); }
+    .msg-ctrl-btn.active { color: var(--text-normal); background: rgba(88,101,242,0.18); }
 
     .msg-textarea {
       background: var(--bg-input);
@@ -543,6 +544,170 @@
       overflow: hidden;
     }
     .ogp-image { display: block; min-width: 100px; object-fit: cover; width: 100px; }
+
+    /* Discord embed (approx) */
+    .dc-embed {
+      --embed-color: #4e5058;
+      background: var(--bg-secondary);
+      border-left: 4px solid var(--embed-color);
+      border-radius: 4px;
+      margin-top: 8px;
+      max-width: 520px;
+      overflow: hidden;
+    }
+    .dc-embed-inner { display: flex; gap: 12px; padding: 12px; }
+    .dc-embed-content { flex: 1; min-width: 0; }
+    .dc-embed-author { color: var(--text-normal); font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+    .dc-embed-title {
+      color: var(--text-link);
+      display: inline-block;
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      text-decoration: none;
+      word-break: break-word;
+    }
+    .dc-embed-title:hover { text-decoration: underline; }
+    .dc-embed-desc { color: var(--text-normal); font-size: 13px; line-height: 1.35; white-space: pre-wrap; word-break: break-word; }
+    .dc-embed-fields {
+      display: grid;
+      gap: 8px 12px;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      margin-top: 10px;
+    }
+    .dc-embed-field { grid-column: span 12; min-width: 0; }
+    .dc-embed-field.inline { grid-column: span 6; }
+    .dc-embed-field-name { color: var(--text-normal); font-size: 12px; font-weight: 700; margin-bottom: 2px; }
+    .dc-embed-field-value { color: var(--text-normal); font-size: 13px; line-height: 1.35; white-space: pre-wrap; word-break: break-word; }
+    .dc-embed-footer { color: var(--text-muted); font-size: 11px; margin-top: 10px; }
+    .dc-embed-thumb {
+      border-radius: 4px;
+      flex: 0 0 80px;
+      height: 80px;
+      object-fit: cover;
+      width: 80px;
+    }
+    .dc-embed-image {
+      border-top: 1px solid var(--border);
+      display: block;
+      max-height: 300px;
+      object-fit: cover;
+      width: 100%;
+    }
+
+    /* Embed editor (left panel) */
+    .embed-editor {
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+      padding-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .embed-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .embed-input {
+      background: var(--bg-input);
+      border: 1px solid transparent;
+      border-radius: 4px;
+      color: var(--text-normal);
+      font-family: inherit;
+      font-size: 12px;
+      outline: none;
+      padding: 4px 8px;
+    }
+    .embed-input:focus { border-color: var(--brand); }
+    .embed-input.full { width: 100%; }
+    .embed-color { width: 34px; height: 28px; border: none; border-radius: 50%; padding: 0; background: none; }
+    .embed-small { font-size: 10px; color: var(--text-muted); font-weight: 700; letter-spacing: .4px; text-transform: uppercase; }
+    .embed-fields-editor { display: flex; flex-direction: column; gap: 6px; }
+    .embed-field-editor {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: rgba(0,0,0,0.08);
+    }
+    .embed-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    /* Emoji picker */
+    .emoji-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      padding: 6px 8px;
+    }
+    .emoji-btn:hover { color: var(--text-normal); border-color: rgba(88,101,242,.6); }
+    .emoji-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      display: none;
+      z-index: 50;
+    }
+    .emoji-backdrop.open { display: block; }
+    .emoji-picker {
+      position: fixed;
+      z-index: 60;
+      width: min(420px, calc(100vw - 24px));
+      max-height: min(520px, calc(100vh - 24px));
+      left: 12px;
+      bottom: 12px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+      display: none;
+      overflow: hidden;
+    }
+    .emoji-picker.open { display: flex; flex-direction: column; }
+    .emoji-picker-header { padding: 10px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
+    .emoji-search {
+      flex: 1;
+      background: var(--bg-input);
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: var(--text-normal);
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+      padding: 7px 10px;
+    }
+    .emoji-search:focus { border-color: var(--brand); }
+    .emoji-close {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 6px 10px;
+    }
+    .emoji-close:hover { color: var(--text-normal); border-color: rgba(88,101,242,.6); }
+    .emoji-grid {
+      padding: 10px;
+      display: grid;
+      grid-template-columns: repeat(10, minmax(0, 1fr));
+      gap: 6px;
+      overflow: auto;
+    }
+    .emoji-item {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 18px;
+      height: 32px;
+      width: 32px;
+      display: grid;
+      place-items: center;
+    }
+    .emoji-item:hover { border-color: rgba(88,101,242,.6); background: rgba(88,101,242,0.18); }
 
     /* Empty preview hint */
     .preview-empty {
@@ -858,6 +1023,7 @@ const STRINGS = {
     copy: 'コピー', copied: 'コピー済み',
     namePlaceholder: 'ユーザー名', msgPlaceholder: 'メッセージを入力…',
     up: '↑', down: '↓', del: '✕',
+    embed: 'Embed', addField: '+ フィールド', delField: '削除',
     tsParseError: '日時の解析に失敗しました',
     tsLabels: { t:'短い時刻', T:'長い時刻', d:'短い日付', D:'長い日付', f:'短い日時', F:'長い日時（曜日付き）', R:'相対時間' },
   },
@@ -869,6 +1035,7 @@ const STRINGS = {
     copy: 'Copy', copied: 'Copied!',
     namePlaceholder: 'Username', msgPlaceholder: 'Enter message…',
     up: '↑', down: '↓', del: '✕',
+    embed: 'Embed', addField: '+ Field', delField: 'Delete',
     tsParseError: 'Failed to parse date/time',
     tsLabels: { t:'Short Time', T:'Long Time', d:'Short Date', D:'Long Date', f:'Short Date/Time', F:'Long Date/Time', R:'Relative' },
   },
@@ -984,6 +1151,115 @@ function initColumnResizer() {
     if (mq.matches) return;
     applySaved();
   });
+}
+
+// ---- Emoji picker (Unicode only) ----
+const EMOJI_DATA = [
+  ['😀','grinning'],['😁','grin'],['😂','joy'],['🤣','rofl'],['😃','smile'],['😄','smile'],['😅','sweat_smile'],
+  ['😉','wink'],['😊','blush'],['😍','heart_eyes'],['😘','kiss'],['😎','sunglasses'],['🤔','thinking'],
+  ['😴','sleeping'],['😤','triumph'],['😭','sob'],['😡','rage'],['👍','thumbs_up'],['👎','thumbs_down'],
+  ['🙏','pray'],['👏','clap'],['🙌','raised_hands'],['🤝','handshake'],['💪','muscle'],['🔥','fire'],
+  ['✨','sparkles'],['🎉','tada'],['🎊','confetti'],['💯','100'],['✅','check'],['❌','x'],
+  ['⭐','star'],['🌟','glowing_star'],['⚠️','warning'],['❗','exclamation'],['❓','question'],
+  ['❤️','heart'],['💙','blue_heart'],['💚','green_heart'],['💛','yellow_heart'],['💜','purple_heart'],
+  ['🖤','black_heart'],['🤍','white_heart'],['💔','broken_heart'],['💡','bulb'],['📌','pushpin'],
+  ['📝','memo'],['📎','paperclip'],['🔗','link'],['📣','megaphone'],['🔔','bell'],
+  ['🎮','game'],['🎧','headphones'],['📷','camera'],['🖼️','frame'],['🧠','brain'],
+  ['🍣','sushi'],['🍜','ramen'],['🍺','beer'],['☕','coffee'],['🍰','cake'],
+  ['🗺️','map'],['✈️','airplane'],['🚀','rocket'],['🧭','compass'],['🏁','flag'],
+  ['🌸','cherry_blossom'],['🌊','wave'],['🌙','moon'],['☀️','sun'],
+  ['🐱','cat'],['🐶','dog'],['🦊','fox'],['🐼','panda'],['🐸','frog'],
+  ['⚡','zap'],['🔒','lock'],['🔓','unlock'],['🛠️','tools'],['🧪','test_tube'],
+];
+
+let emojiPickerEl = null;
+let emojiBackdropEl = null;
+let emojiGridEl = null;
+let emojiSearchEl = null;
+let emojiTargetTa = null;
+
+function insertTextAtCursor(ta, text) {
+  if (!ta) return;
+  const start = ta.selectionStart ?? ta.value.length;
+  const end = ta.selectionEnd ?? ta.value.length;
+  const before = ta.value.slice(0, start);
+  const after = ta.value.slice(end);
+  ta.value = before + text + after;
+  const pos = start + text.length;
+  ta.setSelectionRange(pos, pos);
+}
+
+function renderEmojiGrid(query) {
+  if (!emojiGridEl) return;
+  const q = (query || '').trim().toLowerCase();
+  emojiGridEl.innerHTML = '';
+  const list = q
+    ? EMOJI_DATA.filter(([e, name]) => name.includes(q))
+    : EMOJI_DATA;
+  list.forEach(([emoji, name]) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'emoji-item';
+    btn.title = name;
+    btn.textContent = emoji;
+    btn.addEventListener('click', () => {
+      if (!emojiTargetTa) return;
+      insertTextAtCursor(emojiTargetTa, emoji);
+      emojiTargetTa.dispatchEvent(new Event('input', { bubbles: true }));
+      emojiTargetTa.focus();
+      closeEmojiPicker();
+    });
+    emojiGridEl.appendChild(btn);
+  });
+}
+
+function openEmojiPicker(targetTextarea) {
+  emojiTargetTa = targetTextarea;
+  if (!emojiPickerEl) initEmojiPicker();
+  emojiBackdropEl.classList.add('open');
+  emojiPickerEl.classList.add('open');
+  emojiSearchEl.value = '';
+  renderEmojiGrid('');
+  setTimeout(() => emojiSearchEl.focus(), 0);
+}
+
+function closeEmojiPicker() {
+  if (!emojiPickerEl) return;
+  emojiBackdropEl.classList.remove('open');
+  emojiPickerEl.classList.remove('open');
+  emojiTargetTa = null;
+}
+
+function initEmojiPicker() {
+  if (emojiPickerEl) return;
+  emojiBackdropEl = document.createElement('div');
+  emojiBackdropEl.className = 'emoji-backdrop';
+  emojiBackdropEl.addEventListener('click', closeEmojiPicker);
+
+  emojiPickerEl = document.createElement('div');
+  emojiPickerEl.className = 'emoji-picker';
+  emojiPickerEl.innerHTML = `
+    <div class="emoji-picker-header">
+      <input class="emoji-search" type="text" placeholder="Search emoji...">
+      <button class="emoji-close" type="button">Close</button>
+    </div>
+    <div class="emoji-grid"></div>
+  `;
+
+  emojiSearchEl = emojiPickerEl.querySelector('.emoji-search');
+  emojiGridEl = emojiPickerEl.querySelector('.emoji-grid');
+  emojiPickerEl.querySelector('.emoji-close').addEventListener('click', closeEmojiPicker);
+  emojiSearchEl.addEventListener('input', () => renderEmojiGrid(emojiSearchEl.value));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!emojiPickerEl.classList.contains('open')) return;
+    closeEmojiPicker();
+  });
+
+  document.body.appendChild(emojiBackdropEl);
+  document.body.appendChild(emojiPickerEl);
+  renderEmojiGrid('');
 }
 
 function formatMsgTime() {
@@ -1396,10 +1672,139 @@ function renderOGPCard(ogp, url) {
   </div>`;
 }
 
+function hasEmbedContent(e) {
+  if (!e || !e.enabled) return false;
+  return !!(
+    (e.author || '').trim() ||
+    (e.title || '').trim() ||
+    (e.description || '').trim() ||
+    (e.thumbnail || '').trim() ||
+    (e.image || '').trim() ||
+    (e.footer || '').trim() ||
+    (e.fields && e.fields.some(f => (f.name || '').trim() || (f.value || '').trim()))
+  );
+}
+
+function renderEmbed(e) {
+  if (!hasEmbedContent(e)) return '';
+  const color = (e.color || '#4e5058').trim();
+  const title = (e.title || '').trim();
+  const url = (e.url || '').trim();
+  const author = (e.author || '').trim();
+  const desc = (e.description || '').trim();
+  const thumb = (e.thumbnail || '').trim();
+  const image = (e.image || '').trim();
+  const footer = (e.footer || '').trim();
+
+  const titleHtml = title
+    ? (url
+      ? `<a class="dc-embed-title" href="${escAttr(url)}" target="_blank" rel="noopener noreferrer">${escHtml(title)}</a>`
+      : `<span class="dc-embed-title">${escHtml(title)}</span>`)
+    : '';
+
+  const fields = (e.fields || [])
+    .filter(f => (f.name || '').trim() || (f.value || '').trim())
+    .map(f => `
+      <div class="dc-embed-field ${f.inline ? 'inline' : ''}">
+        ${f.name ? `<div class="dc-embed-field-name">${escHtml(f.name)}</div>` : ''}
+        ${f.value ? `<div class="dc-embed-field-value">${escHtml(f.value)}</div>` : ''}
+      </div>
+    `).join('');
+
+  const fieldsHtml = fields ? `<div class="dc-embed-fields">${fields}</div>` : '';
+  const thumbHtml = thumb
+    ? `<img class="dc-embed-thumb" src="${escAttr(thumb)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+    : '';
+  const imageHtml = image
+    ? `<img class="dc-embed-image" src="${escAttr(image)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+    : '';
+
+  return `<div class="dc-embed" style="--embed-color:${escAttr(color)}">
+    <div class="dc-embed-inner">
+      <div class="dc-embed-content">
+        ${author ? `<div class="dc-embed-author">${escHtml(author)}</div>` : ''}
+        ${titleHtml}
+        ${desc ? `<div class="dc-embed-desc">${escHtml(desc)}</div>` : ''}
+        ${fieldsHtml}
+        ${footer ? `<div class="dc-embed-footer">${escHtml(footer)}</div>` : ''}
+      </div>
+      ${thumbHtml}
+    </div>
+    ${imageHtml}
+  </div>`;
+}
+
 // ---- Message state management ----
 function createMessage() {
   const id = state.nextId++;
-  return { id, name: 'ユーザー', color: AVATAR_COLORS[id % AVATAR_COLORS.length], text: '', plan: 'free' };
+  return {
+    id,
+    name: 'ユーザー',
+    color: AVATAR_COLORS[id % AVATAR_COLORS.length],
+    text: '',
+    plan: 'free',
+    embed: {
+      enabled: false,
+      color: '#4e5058',
+      author: '',
+      title: '',
+      url: '',
+      description: '',
+      thumbnail: '',
+      image: '',
+      footer: '',
+      fields: [], // { name, value, inline }
+    },
+  };
+}
+
+function renderEmbedEditorHtml(msg) {
+  const e = msg.embed;
+  const fieldsHtml = (e.fields || []).map((f, i) => `
+    <div class="embed-field-editor">
+      <div class="embed-row">
+        <input class="embed-input" type="text" placeholder="Field name" data-field-idx="${i}" data-field-key="name" value="${escAttr(f.name || '')}">
+        <button class="msg-ctrl-btn del" data-action="del-field" data-field-idx="${i}" title="${escAttr(t('delField'))}">${t('del')}</button>
+      </div>
+      <textarea class="embed-input full" rows="2" placeholder="Field value" data-field-idx="${i}" data-field-key="value">${escHtml(f.value || '')}</textarea>
+      <label class="toggle-wrap" style="gap:8px;">
+        <input type="checkbox" data-field-idx="${i}" data-field-key="inline" ${f.inline ? 'checked' : ''}>
+        <span class="embed-small">inline</span>
+      </label>
+    </div>
+  `).join('');
+
+  return `
+    <div class="embed-editor">
+      <div class="embed-row">
+        <span class="embed-small">embed</span>
+        <input class="embed-color" type="color" data-embed="color" value="${escAttr(e.color || '#4e5058')}" title="Color">
+      </div>
+      <div class="embed-row">
+        <input class="embed-input" type="text" placeholder="Author" data-embed="author" value="${escAttr(e.author || '')}">
+        <input class="embed-input" type="text" placeholder="Title" data-embed="title" value="${escAttr(e.title || '')}">
+      </div>
+      <div class="embed-row">
+        <input class="embed-input full" type="text" placeholder="URL (optional)" data-embed="url" value="${escAttr(e.url || '')}">
+      </div>
+      <div class="embed-row">
+        <textarea class="embed-input full" rows="3" placeholder="Description" data-embed="description">${escHtml(e.description || '')}</textarea>
+      </div>
+      <div class="embed-row">
+        <input class="embed-input" type="text" placeholder="Thumbnail URL" data-embed="thumbnail" value="${escAttr(e.thumbnail || '')}">
+        <input class="embed-input" type="text" placeholder="Image URL" data-embed="image" value="${escAttr(e.image || '')}">
+      </div>
+      <div class="embed-row">
+        <input class="embed-input full" type="text" placeholder="Footer" data-embed="footer" value="${escAttr(e.footer || '')}">
+      </div>
+      <div class="embed-actions">
+        <button class="msg-ctrl-btn" data-action="add-field" title="${escAttr(t('addField'))}">${t('addField')}</button>
+      </div>
+      <div class="embed-fields-editor">
+        ${fieldsHtml}
+      </div>
+    </div>
+  `;
 }
 
 function addMessage() {
@@ -1450,9 +1855,12 @@ function renderEditors() {
         <button class="msg-ctrl-btn" data-action="up" title="上へ">${t('up')}</button>
         <button class="msg-ctrl-btn" data-action="down" title="下へ">${t('down')}</button>
         <button class="msg-ctrl-btn del" data-action="del" title="削除">${t('del')}</button>
+        <button class="msg-ctrl-btn ${msg.embed && msg.embed.enabled ? 'active' : ''}" data-action="toggle-embed" title="Embed">${t('embed')}</button>
       </div>
       <textarea class="msg-textarea" maxlength="${limit + 500}" placeholder="${escAttr(t('msgPlaceholder'))}">${escHtml(msg.text)}</textarea>
+      ${msg.embed && msg.embed.enabled ? renderEmbedEditorHtml(msg) : ''}
       <div class="msg-footer-row">
+        <button class="emoji-btn" data-action="emoji" title="Emoji">😀</button>
         <select class="plan-select">
           <option value="free" ${msg.plan==='free'?'selected':''}>Free (2000)</option>
           <option value="nitro" ${msg.plan==='nitro'?'selected':''}>Nitro (4000)</option>
@@ -1484,6 +1892,50 @@ function renderEditors() {
     div.querySelector('[data-action=up]').addEventListener('click', () => moveMessage(msg.id, -1));
     div.querySelector('[data-action=down]').addEventListener('click', () => moveMessage(msg.id, 1));
     div.querySelector('[data-action=del]').addEventListener('click', () => removeMessage(msg.id));
+    div.querySelector('[data-action=toggle-embed]').addEventListener('click', () => {
+      msg.embed.enabled = !msg.embed.enabled;
+      renderEditors();
+      renderPreview();
+    });
+
+    const emojiBtn = div.querySelector('[data-action=emoji]');
+    emojiBtn.addEventListener('click', () => openEmojiPicker(ta));
+
+    // Embed editor events
+    div.querySelectorAll('[data-embed]').forEach(el => {
+      const key = el.dataset.embed;
+      const evt = el.tagName === 'TEXTAREA' ? 'input' : 'input';
+      el.addEventListener(evt, (e) => {
+        msg.embed[key] = e.target.value;
+        renderPreview();
+      });
+    });
+    div.querySelectorAll('[data-action=add-field]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        msg.embed.fields.push({ name: '', value: '', inline: false });
+        renderEditors();
+        renderPreview();
+      });
+    });
+    div.querySelectorAll('[data-action=del-field]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.dataset.fieldIdx, 10);
+        if (!Number.isFinite(i)) return;
+        msg.embed.fields.splice(i, 1);
+        renderEditors();
+        renderPreview();
+      });
+    });
+    div.querySelectorAll('[data-field-idx][data-field-key]').forEach(el => {
+      const i = parseInt(el.dataset.fieldIdx, 10);
+      const k = el.dataset.fieldKey;
+      const ev = el.type === 'checkbox' ? 'change' : 'input';
+      el.addEventListener(ev, (e) => {
+        if (!msg.embed.fields[i]) return;
+        msg.embed.fields[i][k] = (e.target.type === 'checkbox') ? e.target.checked : e.target.value;
+        renderPreview();
+      });
+    });
 
     list.appendChild(div);
     // After insertion, measure with correct width and grow.
@@ -1523,6 +1975,7 @@ function renderPreview() {
       return {
         msg,
         html,
+        embedHtml: renderEmbed(msg.embed),
         ogpUrls: ogpEnabled ? ogpUrls : [],
         initLetter,
         bgColor: avatarColor(msg.name),
@@ -1539,6 +1992,7 @@ function renderPreview() {
           <span class="dc-msg-ts">${escHtml(ts)}</span>
         </div>
         <div class="dc-msg-body">${f.html}</div>
+        ${f.embedHtml}
         <div class="ogp-container"></div>
       </div>
     </div>`).join('');
@@ -1750,6 +2204,7 @@ document.getElementById('lang-btn').addEventListener('click', () => {
 
 // ---- Init ----
 initColumnResizer();
+initEmojiPicker();
 addMessage();
 initTimestampTool();
 updateChannelHeader();
