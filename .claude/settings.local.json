@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:cdnjs.cloudflare.com)",
+      "Bash(curl -s https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js)",
+      "Bash(curl -s --max-time 10 \"https://api.allorigins.win/get?url=https%3A%2F%2Fexample.com\" -o /dev/null -w \"HTTP %{http_code}, time: %{time_total}s\")",
+      "Bash(curl -s --max-time 10 \"https://corsproxy.io/?url=https%3A%2F%2Fgithub.com%2Fmicrosoft%2Fvscode\" -o /dev/null -w \"HTTP %{http_code}, time: %{time_total}s\\\\n\")",
+      "Bash(curl -s --max-time 10 \"https://api.codetabs.com/v1/proxy?quest=https://example.com\" -o /dev/null -w \"HTTP %{http_code}, time: %{time_total}s\\\\n\")",
+      "Bash(curl -s --max-time 10 \"https://api.allorigins.win/raw?url=https%3A%2F%2Fexample.com\" -o /dev/null -w \"HTTP %{http_code}, time: %{time_total}s\\\\n\")",
+      "Bash(curl -s --max-time 10 -L \"https://api.codetabs.com/v1/proxy?quest=https://example.com\" -o /dev/null -w \"HTTP %{http_code}, time: %{time_total}s\\\\n\")",
+      "Bash(curl -s --max-time 10 \"https://corsproxy.io/?https://example.com\" -o /dev/null -w \"HTTP %{http_code}, time: %{time_total}s\\\\n\")",
+      "Bash(curl -s --max-time 10 -L \"https://api.codetabs.com/v1/proxy?quest=https://github.com/microsoft/vscode\" -w \"\\\\nHTTP %{http_code}, time: %{time_total}s\\\\n\")"
+    ]
+  }
+}
