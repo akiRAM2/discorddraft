@@ -694,19 +694,11 @@
         <div class="settings-row">
           <span class="settings-label" data-i18n="channel">チャンネル</span>
           <input type="text" id="channel-name-input" class="settings-input" value="general" placeholder="general">
-          <label class="toggle-wrap">
-            <input type="checkbox" id="toggle-header">
-            <span data-i18n="showHeader">ヘッダー表示</span>
-          </label>
         </div>
         <div class="settings-row">
           <label class="toggle-wrap">
             <input type="checkbox" id="toggle-ogp" checked>
             <span data-i18n="ogpPreview">OGPプレビュー</span>
-          </label>
-          <label class="toggle-wrap">
-            <input type="checkbox" id="toggle-announce">
-            <span data-i18n="announce">📢 アナウンス</span>
           </label>
         </div>
       </div>
@@ -719,10 +711,9 @@
 
     <!-- Right: preview panel -->
     <div class="panel-preview">
-      <div class="channel-header hidden" id="channel-header">
+      <div class="channel-header" id="channel-header">
         <span class="channel-icon" id="channel-icon">#</span>
         <span class="channel-name" id="channel-name-display">general</span>
-        <span class="announcement-badge hidden" id="announce-badge" data-i18n="announceBadge">アナウンス</span>
       </div>
       <div class="messages-container" id="messages-container">
         <div class="preview-empty">
@@ -860,8 +851,7 @@ Prism.languages.json={property:{pattern:/(^|[^\\])"(?:\\.|[^\\"\r\n])*"(?=\s*:)/
 // ---- i18n ----
 const STRINGS = {
   ja: {
-    channel: 'チャンネル', showHeader: 'ヘッダー表示', ogpPreview: 'OGPプレビュー',
-    announce: '📢 アナウンス', announceBadge: 'アナウンス',
+    channel: 'チャンネル', ogpPreview: 'OGPプレビュー',
     addMessage: '＋ メッセージを追加',
     emptyHint: 'メッセージを入力するとプレビューが表示されます',
     datetime: '日時', timezone: 'タイムゾーン', now: '今すぐ',
@@ -872,8 +862,7 @@ const STRINGS = {
     tsLabels: { t:'短い時刻', T:'長い時刻', d:'短い日付', D:'長い日付', f:'短い日時', F:'長い日時（曜日付き）', R:'相対時間' },
   },
   en: {
-    channel: 'Channel', showHeader: 'Show Header', ogpPreview: 'OGP Preview',
-    announce: '📢 Announce', announceBadge: 'Announce',
+    channel: 'Channel', ogpPreview: 'OGP Preview',
     addMessage: '+ Add Message',
     emptyHint: 'Type a message to see the preview',
     datetime: 'Date/Time', timezone: 'Timezone', now: 'Now',
@@ -1069,6 +1058,24 @@ function parseInline(text, suppressedOgpUrls, ogpUrls) {
     return `\x00${tokens.length - 1}\x00`;
   }
 
+  function renderInlineLabel(labelText) {
+    // Render basic inline styles inside markdown link labels, without creating nested links.
+    // Escape first to avoid HTML injection, then apply formatting markers.
+    let s = escHtml(labelText);
+    s = s.replace(/`([^`\n]+)`/g, (_, code) => `<code class="dc-inline-code">${code}</code>`);
+    s = s.replace(/\|\|(.+?)\|\|/gs, (_, c) => `<span class="dc-spoiler" onclick="this.classList.toggle('revealed')">${c}</span>`);
+    s = s.replace(/\*\*\*(.+?)\*\*\*/gs, (_, c) => `<strong><em>${c}</em></strong>`);
+    s = s.replace(/\*\*(.+?)\*\*/gs, (_, c) => `<strong>${c}</strong>`);
+    s = s.replace(/___(.+?)___/gs, (_, c) => `<u><em>${c}</em></u>`);
+    s = s.replace(/__(.+?)__/gs, (_, c) => `<u>${c}</u>`);
+    s = s.replace(/\*([^*\n]+)\*/g, (_, c) => `<em>${c}</em>`);
+    s = s.replace(/(?<![\\w])_([^_\n]+)_(?![\\w])/g, (_, c) => `<em>${c}</em>`);
+    s = s.replace(/~~(.+?)~~/gs, (_, c) => `<s>${c}</s>`);
+    s = s.replace(/@(\w+)/g, (_, n) => `<span class="dc-mention">@${n}</span>`);
+    s = s.replace(/#([\w-]+)/g, (_, n) => `<span class="dc-channel-mention">#${n}</span>`);
+    return s;
+  }
+
   // 1. Inline code
   text = text.replace(/`([^`\n]+)`/g, (_, code) =>
     protect(`<code class="dc-inline-code">${escHtml(code)}</code>`)
@@ -1081,13 +1088,14 @@ function parseInline(text, suppressedOgpUrls, ogpUrls) {
 
   // 3. Markdown links: [text](url) / [text](<url>)
   // Note: Discord doesn't support masked links in normal messages, but this tool does.
-  text = text.replace(/\[([^\]\n]+)\]\(\s*(<)?(https?:\/\/[^\s>]+)(?:>)?\s*\)/g, (_, label, angle, url) => {
+  text = text.replace(/\[\s*([^\]\n]+?)\s*\]\(\s*(<)?(https?:\/\/[^\s>]+)(?:>)?\s*\)/g, (_, label, angle, url) => {
     const suppress = !!angle;
     if (suppress) suppressedOgpUrls.add(url);
     else ogpUrls.push(url);
     const cls = suppress ? 'dc-link' : 'dc-link ogp-trigger';
     const data = suppress ? '' : ` data-url="${escAttr(url)}"`;
-    return protect(`<a class="${cls}" href="${escAttr(url)}" target="_blank" rel="noopener noreferrer"${data}>${escHtml(label)}</a>`);
+    const labelHtml = renderInlineLabel(String(label || '').trim());
+    return protect(`<a class="${cls}" href="${escAttr(url)}" target="_blank" rel="noopener noreferrer"${data}>${labelHtml}</a>`);
   });
 
   // 4. <URL> suppress-OGP links
@@ -1560,17 +1568,13 @@ function renderPreview() {
 // ---- Channel header ----
 function updateChannelHeader() {
   const name = document.getElementById('channel-name-input').value || 'general';
-  const showHeader = document.getElementById('toggle-header').checked;
-  const isAnnounce = document.getElementById('toggle-announce').checked;
   const header = document.getElementById('channel-header');
   const icon = document.getElementById('channel-icon');
   const nameDisplay = document.getElementById('channel-name-display');
-  const badge = document.getElementById('announce-badge');
 
-  header.classList.toggle('hidden', !showHeader);
-  icon.textContent = isAnnounce ? '📢' : '#';
+  header.classList.remove('hidden');
+  icon.textContent = '#';
   nameDisplay.textContent = name;
-  badge.classList.toggle('hidden', !isAnnounce);
 }
 
 // ---- Tabs ----
@@ -1585,8 +1589,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 // ---- Settings events ----
 document.getElementById('channel-name-input').addEventListener('input', updateChannelHeader);
-document.getElementById('toggle-header').addEventListener('change', updateChannelHeader);
-document.getElementById('toggle-announce').addEventListener('change', updateChannelHeader);
 document.getElementById('toggle-ogp').addEventListener('change', e => {
   ogpEnabled = e.target.checked;
   renderPreview();
