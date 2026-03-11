@@ -1177,6 +1177,7 @@ let emojiBackdropEl = null;
 let emojiGridEl = null;
 let emojiSearchEl = null;
 let emojiTargetTa = null;
+let emojiAnchorEl = null;
 
 function insertTextAtCursor(ta, text) {
   if (!ta) return;
@@ -1213,13 +1214,44 @@ function renderEmojiGrid(query) {
   });
 }
 
-function openEmojiPicker(targetTextarea) {
+function positionEmojiPickerNear(anchorEl) {
+  if (!emojiPickerEl || !anchorEl) return;
+  const margin = 12;
+  const gap = 8;
+  const r = anchorEl.getBoundingClientRect();
+
+  // Ensure we can measure picker.
+  const pr = emojiPickerEl.getBoundingClientRect();
+  const pw = pr.width || 420;
+  const ph = pr.height || 520;
+
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  let left = clamp(r.left, margin, vw - margin - pw);
+  let top = r.bottom + gap;
+
+  // Flip above if it would go off-screen below.
+  if (top + ph > vh - margin) {
+    top = r.top - gap - ph;
+  }
+  top = clamp(top, margin, vh - margin - ph);
+
+  emojiPickerEl.style.left = `${Math.round(left)}px`;
+  emojiPickerEl.style.top = `${Math.round(top)}px`;
+  emojiPickerEl.style.right = 'auto';
+  emojiPickerEl.style.bottom = 'auto';
+}
+
+function openEmojiPicker(targetTextarea, anchorEl) {
   emojiTargetTa = targetTextarea;
+  emojiAnchorEl = anchorEl || targetTextarea;
   if (!emojiPickerEl) initEmojiPicker();
   emojiBackdropEl.classList.add('open');
   emojiPickerEl.classList.add('open');
   emojiSearchEl.value = '';
   renderEmojiGrid('');
+  requestAnimationFrame(() => positionEmojiPickerNear(emojiAnchorEl));
   setTimeout(() => emojiSearchEl.focus(), 0);
 }
 
@@ -1228,6 +1260,7 @@ function closeEmojiPicker() {
   emojiBackdropEl.classList.remove('open');
   emojiPickerEl.classList.remove('open');
   emojiTargetTa = null;
+  emojiAnchorEl = null;
 }
 
 function initEmojiPicker() {
@@ -1899,7 +1932,7 @@ function renderEditors() {
     });
 
     const emojiBtn = div.querySelector('[data-action=emoji]');
-    emojiBtn.addEventListener('click', () => openEmojiPicker(ta));
+    emojiBtn.addEventListener('click', () => openEmojiPicker(ta, emojiBtn));
 
     // Embed editor events
     div.querySelectorAll('[data-embed]').forEach(el => {
