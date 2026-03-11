@@ -1856,11 +1856,11 @@ function renderEditors() {
         <button class="msg-ctrl-btn" data-action="down" title="下へ">${t('down')}</button>
         <button class="msg-ctrl-btn del" data-action="del" title="削除">${t('del')}</button>
         <button class="msg-ctrl-btn ${msg.embed && msg.embed.enabled ? 'active' : ''}" data-action="toggle-embed" title="Embed">${t('embed')}</button>
+        <button class="emoji-btn" data-action="emoji" title="Emoji">😀</button>
       </div>
       <textarea class="msg-textarea" maxlength="${limit + 500}" placeholder="${escAttr(t('msgPlaceholder'))}">${escHtml(msg.text)}</textarea>
       ${msg.embed && msg.embed.enabled ? renderEmbedEditorHtml(msg) : ''}
       <div class="msg-footer-row">
-        <button class="emoji-btn" data-action="emoji" title="Emoji">😀</button>
         <select class="plan-select">
           <option value="free" ${msg.plan==='free'?'selected':''}>Free (2000)</option>
           <option value="nitro" ${msg.plan==='nitro'?'selected':''}>Nitro (4000)</option>
