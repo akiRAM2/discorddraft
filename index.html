@@ -1,0 +1,1758 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DiscordDraft - Discord Preview</title>
+  <meta name="description" content="Discordの投稿を本家UI風にプレビュー。OGPカード表示やDiscordタイムスタンプ変換にも対応。">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="DiscordDraft - Discord Preview">
+  <meta property="og:description" content="Discordの投稿を本家UI風にプレビュー。OGPカード表示やDiscordタイムスタンプ変換にも対応。">
+  <meta name="twitter:card" content="summary">
+  <style>
+    /* === Reset === */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* === CSS Variables (Discord dark theme) === */
+    :root {
+      --bg-primary:   #313338;
+      --bg-secondary: #2b2d31;
+      --bg-tertiary:  #1e1f22;
+      --bg-input:     #383a40;
+      --bg-hover:     rgba(255,255,255,0.06);
+      --text-normal:  #dbdee1;
+      --text-muted:   #949ba4;
+      --text-link:    #00a8fc;
+      --brand:        #5865f2;
+      --mention-bg:   rgba(88,101,242,0.15);
+      --mention-fg:   #c9cdfb;
+      --spoiler-bg:   #202225;
+      --code-bg:      #2b2d31;
+      --code-border:  #1e1f22;
+      --quote-bar:    #4e5058;
+      --border:       #3f4147;
+      --green:        #23a559;
+      --red:          #f23f43;
+      --yellow:       #f0b232;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg-primary);
+      color: var(--text-normal);
+      font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.375;
+      overflow: hidden;
+    }
+
+    #app { display: flex; flex-direction: column; height: 100%; }
+
+    /* === Tab nav === */
+    .tab-nav {
+      display: flex;
+      gap: 2px;
+      padding: 8px 12px 0;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      align-items: flex-end;
+    }
+    .tab-nav-spacer { flex: 1; }
+    .lang-toggle {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      cursor: pointer;
+      display: flex;
+      gap: 2px;
+      margin-bottom: 4px;
+      padding: 3px;
+    }
+    .lang-opt {
+      border-radius: 16px;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 10px;
+      transition: background .15s, color .15s;
+      white-space: nowrap;
+    }
+    .lang-opt.active {
+      background: var(--brand);
+      color: #fff;
+    }
+    .lang-toggle:hover .lang-opt:not(.active) { color: var(--text-normal); }
+    .tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      border-radius: 4px 4px 0 0;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      padding: 8px 16px;
+      transition: color .15s, border-color .15s;
+    }
+    .tab-btn:hover { color: var(--text-normal); }
+    .tab-btn.active { color: var(--text-normal); border-bottom-color: var(--brand); }
+
+    /* === Tab content === */
+    .tab-content { display: none; flex: 1; min-height: 0; }
+    .tab-content.active { display: flex; }
+
+    /* === Preview tab layout === */
+    #tab-preview { flex-direction: row; }
+
+    /* === Input panel === */
+    .panel-input {
+      flex: 0 0 var(--input-panel-width, 42%);
+      min-width: 280px;
+      background: var(--bg-secondary);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .col-resizer {
+      width: 6px;
+      background: var(--border);
+      cursor: col-resize;
+      flex: 0 0 6px;
+      position: relative;
+    }
+    .col-resizer::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.06);
+      opacity: 0;
+      transition: opacity .12s;
+    }
+    .col-resizer:hover::after { opacity: 1; }
+    body.resizing { cursor: col-resize; user-select: none; }
+    .panel-input-header {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .settings-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .settings-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .settings-input {
+      background: var(--bg-input);
+      border: 1px solid transparent;
+      border-radius: 4px;
+      color: var(--text-normal);
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      padding: 4px 8px;
+    }
+    .settings-input:focus { border-color: var(--brand); }
+    #channel-name-input { width: 130px; }
+
+    /* Toggle switch */
+    .toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+    }
+    .toggle-wrap input[type=checkbox] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 32px;
+      height: 18px;
+      background: var(--bg-input);
+      border-radius: 9px;
+      cursor: pointer;
+      position: relative;
+      transition: background .2s;
+      flex-shrink: 0;
+    }
+    .toggle-wrap input[type=checkbox]::after {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background: #fff;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: left .2s;
+    }
+    .toggle-wrap input[type=checkbox]:checked { background: var(--brand); }
+    .toggle-wrap input[type=checkbox]:checked::after { left: 16px; }
+
+    /* Message list */
+    .message-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Message editor */
+    .message-editor {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .message-editor:focus-within { border-color: rgba(88,101,242,.5); }
+
+    .msg-header-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .msg-name-input {
+      flex: 1;
+      background: var(--bg-input);
+      border: 1px solid transparent;
+      border-radius: 4px;
+      color: var(--text-normal);
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      outline: none;
+      padding: 4px 8px;
+    }
+    .msg-name-input:focus { border-color: var(--brand); }
+
+    .msg-color-input {
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      padding: 0;
+      background: none;
+      overflow: hidden;
+    }
+    .msg-ctrl-btn {
+      background: none;
+      border: none;
+      border-radius: 3px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      padding: 3px 6px;
+      transition: color .1s, background .1s;
+    }
+    .msg-ctrl-btn:hover { color: var(--text-normal); background: var(--bg-hover); }
+    .msg-ctrl-btn.del:hover { color: var(--red); }
+
+    .msg-textarea {
+      background: var(--bg-input);
+      border: 1px solid transparent;
+      border-radius: 4px;
+      color: var(--text-normal);
+      font-family: inherit;
+      font-size: 14px;
+      line-height: 1.375;
+      min-height: 72px;
+      max-height: 40vh;
+      outline: none;
+      padding: 7px 9px;
+      resize: none;
+      width: 100%;
+      overflow-y: auto;
+    }
+    .msg-textarea:focus { border-color: var(--brand); }
+
+    .msg-footer-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .plan-select {
+      appearance: none;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      outline: none;
+      padding: 2px 8px;
+    }
+    .char-counter {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+    .char-counter.warn { color: var(--yellow); }
+    .char-counter.over { color: var(--red); }
+
+    /* Add message btn */
+    .add-message-btn {
+      background: var(--brand);
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      margin: 8px 12px;
+      padding: 9px 16px;
+      transition: background .1s, transform .1s;
+      flex-shrink: 0;
+    }
+    .add-message-btn:hover { background: #4752c4; }
+    .add-message-btn:active { transform: scale(0.97); }
+
+    /* === Preview panel === */
+    .panel-preview {
+      flex: 1;
+      background: var(--bg-primary);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    /* Channel header */
+    .channel-header {
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-shrink: 0;
+      gap: 8px;
+      padding: 12px 16px;
+    }
+    .channel-header.hidden { display: none; }
+    .channel-icon { color: var(--text-muted); font-size: 22px; }
+    .channel-name { font-size: 15px; font-weight: 700; }
+    .announcement-badge {
+      background: var(--brand);
+      border-radius: 3px;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      padding: 1px 5px;
+      text-transform: uppercase;
+    }
+
+    /* Messages container */
+    .messages-container {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      gap: 4px;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    /* Discord message */
+    .dc-message {
+      border-radius: 4px;
+      display: flex;
+      gap: 16px;
+      padding: 4px 8px;
+    }
+    .dc-message:hover { background: var(--bg-hover); }
+
+    .dc-avatar {
+      align-items: center;
+      border-radius: 50%;
+      color: #fff;
+      display: flex;
+      flex-shrink: 0;
+      font-size: 17px;
+      font-weight: 700;
+      height: 40px;
+      justify-content: center;
+      margin-top: 2px;
+      width: 40px;
+    }
+    .dc-msg-content { flex: 1; min-width: 0; }
+    .dc-msg-header {
+      align-items: baseline;
+      display: flex;
+      gap: 8px;
+      margin-bottom: 2px;
+    }
+    .dc-username { font-size: 15px; font-weight: 500; }
+    .dc-msg-ts { color: var(--text-muted); font-size: 11px; }
+    .dc-msg-body { font-size: 15px; line-height: 1.375; word-break: break-word; }
+    .dc-msg-body > *:first-child { margin-top: 0; }
+
+    /* === Markdown rendered styles === */
+    .dc-msg-body strong { font-weight: 700; }
+    .dc-msg-body em { font-style: italic; }
+    .dc-msg-body u { text-decoration: underline; }
+    .dc-msg-body s { text-decoration: line-through; }
+
+    .dc-h1 {
+      font-size: 1.5em;
+      font-weight: 700;
+      line-height: 1.25;
+      margin: 8px 0 4px;
+    }
+    .dc-h2 { font-size: 1.25em; font-weight: 700; line-height: 1.25; margin: 6px 0 4px; }
+    .dc-h3 { font-size: 1em; font-weight: 700; line-height: 1.25; margin: 4px 0; }
+    .dc-subtext { color: var(--text-muted); font-size: 0.8em; display: block; }
+
+    .dc-blockquote {
+      display: flex;
+      gap: 0;
+      margin: 4px 0;
+    }
+    .dc-quote-bar {
+      background: var(--quote-bar);
+      border-radius: 4px;
+      flex-shrink: 0;
+      min-height: 100%;
+      width: 4px;
+    }
+    .dc-quote-content { color: var(--text-normal); padding: 4px 12px; }
+
+    .dc-ul, .dc-ol { margin: 4px 0; padding-left: 20px; }
+    .dc-ul li, .dc-ol li { margin: 2px 0; }
+
+    code.dc-inline-code {
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 3px;
+      font-family: Consolas, 'Andale Mono', 'Courier New', monospace;
+      font-size: .875em;
+      padding: 1px 4px;
+    }
+    .dc-codeblock {
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 4px;
+      margin: 4px 0;
+      overflow: hidden;
+    }
+    .dc-codeblock-lang {
+      border-bottom: 1px solid var(--code-border);
+      color: var(--text-muted);
+      font-family: Consolas, monospace;
+      font-size: 11px;
+      letter-spacing: .5px;
+      padding: 4px 12px;
+      text-transform: uppercase;
+    }
+    .dc-codeblock pre {
+      font-family: Consolas, 'Andale Mono', 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 0;
+      overflow-x: auto;
+      padding: 8px 12px;
+    }
+    .dc-codeblock pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+    .dc-mention {
+      background: var(--mention-bg);
+      border-radius: 3px;
+      color: var(--mention-fg);
+      cursor: pointer;
+      font-weight: 500;
+      padding: 0 2px;
+    }
+    .dc-mention:hover { background: rgba(88,101,242,.3); }
+    .dc-channel-mention {
+      background: var(--mention-bg);
+      border-radius: 3px;
+      color: var(--mention-fg);
+      cursor: pointer;
+      padding: 0 2px;
+    }
+    .dc-channel-mention:hover { background: rgba(88,101,242,.3); }
+
+    .dc-spoiler {
+      background: var(--spoiler-bg);
+      border-radius: 3px;
+      color: transparent;
+      cursor: pointer;
+      padding: 0 2px;
+      transition: color .15s, background .15s;
+      user-select: none;
+    }
+    .dc-spoiler.revealed { background: rgba(0,0,0,.15); color: inherit; cursor: default; }
+
+    .dc-ts-pill {
+      background: var(--bg-input);
+      border-radius: 3px;
+      font-size: .875em;
+      padding: 0 4px;
+    }
+
+    .dc-link { color: var(--text-link); text-decoration: none; }
+    .dc-link:hover { text-decoration: underline; }
+
+    /* OGP card */
+    .ogp-card {
+      background: var(--bg-secondary);
+      border-left: 4px solid var(--bg-tertiary);
+      border-radius: 0 4px 4px 0;
+      display: flex;
+      margin-top: 8px;
+      max-width: 520px;
+      overflow: hidden;
+    }
+    .ogp-card-body { flex: 1; min-width: 0; padding: 12px; }
+    .ogp-site { color: var(--text-muted); font-size: 12px; margin-bottom: 4px; }
+    .ogp-title {
+      color: var(--text-link);
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      text-decoration: none;
+    }
+    .ogp-title:hover { text-decoration: underline; }
+    .ogp-desc {
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      color: var(--text-muted);
+      display: -webkit-box;
+      font-size: 13px;
+      line-height: 1.4;
+      overflow: hidden;
+    }
+    .ogp-image { display: block; min-width: 100px; object-fit: cover; width: 100px; }
+
+    /* Empty preview hint */
+    .preview-empty {
+      align-items: center;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      font-size: 13px;
+      gap: 8px;
+      height: 100%;
+      justify-content: center;
+      text-align: center;
+    }
+    .preview-empty-icon { font-size: 48px; opacity: .4; }
+
+    /* === Timestamp tab === */
+    #tab-timestamp {
+      align-items: flex-start;
+      justify-content: center;
+      overflow-y: auto;
+      padding: 28px 24px;
+    }
+    .ts-tool { margin: 0 auto; max-width: 620px; width: 100%; }
+    .ts-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+    .ts-inputs {
+      align-items: flex-end;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .ts-field { display: flex; flex-direction: column; gap: 4px; }
+    .ts-field label {
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+    .ts-dt-input {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-normal);
+      color-scheme: dark;
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      padding: 6px 10px;
+    }
+    .ts-dt-input:focus { border-color: var(--brand); }
+    .ts-tz-select {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-normal);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      max-width: 260px;
+      outline: none;
+      padding: 6px 10px;
+    }
+    .ts-now-btn {
+      background: var(--brand);
+      border: none;
+      border-radius: 4px;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 16px;
+    }
+    .ts-now-btn:hover { filter: brightness(1.1); }
+    .ts-formats { display: flex; flex-direction: column; gap: 8px; }
+    .ts-format-row {
+      align-items: center;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      display: flex;
+      gap: 10px;
+      padding: 10px 14px;
+    }
+    .ts-format-code {
+      color: var(--text-muted);
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      min-width: 160px;
+    }
+    .ts-format-preview { flex: 1; font-size: 14px; }
+    .ts-copy-btn {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      padding: 4px 12px;
+      transition: color .1s, border-color .1s;
+      white-space: nowrap;
+    }
+    .ts-copy-btn:hover { border-color: var(--brand); color: var(--text-normal); }
+    .ts-copy-btn.copied { border-color: var(--green); color: var(--green); }
+
+    /* === Scrollbar === */
+    ::-webkit-scrollbar { height: 8px; width: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+    /* === Prism tomorrow theme === */
+    code[class*=language-],pre[class*=language-]{color:#ccc;background:0 0;font-family:Consolas,Monaco,'Andale Mono','Ubuntu Mono',monospace;font-size:1em;text-align:left;white-space:pre;word-spacing:normal;word-break:normal;word-wrap:normal;line-height:1.5;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-hyphens:none;-moz-hyphens:none;-ms-hyphens:none;hyphens:none}pre[class*=language-]{padding:1em;margin:.5em 0;overflow:auto}:not(pre)>code[class*=language-],pre[class*=language-]{background:#2d2d2d}:not(pre)>code[class*=language-]{padding:.1em;border-radius:.3em;white-space:normal}.token.block-comment,.token.cdata,.token.comment,.token.doctype,.token.prolog{color:#999}.token.punctuation{color:#ccc}.token.attr-name,.token.deleted,.token.namespace,.token.tag{color:#e2777a}.token.function-name{color:#6196cc}.token.boolean,.token.function,.token.number{color:#f08d49}.token.class-name,.token.constant,.token.property,.token.symbol{color:#f8c555}.token.atrule,.token.builtin,.token.important,.token.keyword,.token.selector{color:#cc99cd}.token.attr-value,.token.char,.token.regex,.token.string,.token.variable{color:#7ec699}.token.entity,.token.operator,.token.url{color:#67cdcc}.token.bold,.token.important{font-weight:700}.token.italic{font-style:italic}.token.entity{cursor:help}.token.inserted{color:green}
+
+    /* === Mobile === */
+    @media (max-width: 680px) {
+      html, body { overflow: auto; }
+      #app { height: auto; min-height: 100%; }
+      #tab-preview { flex-direction: column; }
+      .col-resizer { display: none; }
+      .panel-input { flex: 0 0 auto; width: 100%; min-width: 0; border-bottom: 1px solid var(--border); max-height: 55vh; }
+      .panel-preview { min-height: 300px; }
+      .tab-content.active { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Tab navigation -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="preview">📝 Preview</button>
+    <button class="tab-btn" data-tab="timestamp">🕐 Timestamp</button>
+    <div class="tab-nav-spacer"></div>
+    <button class="lang-toggle" id="lang-btn" title="Switch language">
+      <span class="lang-opt" data-l="ja">JA</span>
+      <span class="lang-opt" data-l="en">EN</span>
+    </button>
+  </nav>
+
+  <!-- Preview tab -->
+  <div id="tab-preview" class="tab-content active">
+
+    <!-- Left: input panel -->
+    <div class="panel-input">
+      <div class="panel-input-header">
+        <div class="settings-row">
+          <span class="settings-label" data-i18n="channel">チャンネル</span>
+          <input type="text" id="channel-name-input" class="settings-input" value="general" placeholder="general">
+          <label class="toggle-wrap">
+            <input type="checkbox" id="toggle-header">
+            <span data-i18n="showHeader">ヘッダー表示</span>
+          </label>
+        </div>
+        <div class="settings-row">
+          <label class="toggle-wrap">
+            <input type="checkbox" id="toggle-ogp" checked>
+            <span data-i18n="ogpPreview">OGPプレビュー</span>
+          </label>
+          <label class="toggle-wrap">
+            <input type="checkbox" id="toggle-announce">
+            <span data-i18n="announce">📢 アナウンス</span>
+          </label>
+        </div>
+      </div>
+
+      <button class="add-message-btn" id="add-message-btn" data-i18n="addMessage">＋ メッセージを追加</button>
+      <div class="message-list" id="message-list"></div>
+    </div>
+
+    <div class="col-resizer" id="col-resizer" role="separator" aria-orientation="vertical" aria-label="Resize columns"></div>
+
+    <!-- Right: preview panel -->
+    <div class="panel-preview">
+      <div class="channel-header hidden" id="channel-header">
+        <span class="channel-icon" id="channel-icon">#</span>
+        <span class="channel-name" id="channel-name-display">general</span>
+        <span class="announcement-badge hidden" id="announce-badge" data-i18n="announceBadge">アナウンス</span>
+      </div>
+      <div class="messages-container" id="messages-container">
+        <div class="preview-empty">
+          <div class="preview-empty-icon">💬</div>
+          <div data-i18n="emptyHint">メッセージを入力するとプレビューが表示されます</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Timestamp tab -->
+  <div id="tab-timestamp" class="tab-content">
+    <div class="ts-tool">
+      <div class="ts-title">⏱ Timestamp Converter</div>
+      <div class="ts-inputs">
+        <div class="ts-field">
+          <label data-i18n="datetime">日時</label>
+          <input type="datetime-local" id="ts-datetime" class="ts-dt-input">
+        </div>
+        <div class="ts-field">
+          <label data-i18n="timezone">タイムゾーン</label>
+          <select id="ts-timezone" class="ts-tz-select"></select>
+        </div>
+        <button class="ts-now-btn" id="ts-now-btn" data-i18n="now">今すぐ</button>
+      </div>
+      <div class="ts-formats" id="ts-formats"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// Prism.js core (MIT license, https://prismjs.com)
+// ============================================================
+var _self="undefined"!=typeof window?window:"undefined"!=typeof WorkerGlobalScope&&self instanceof WorkerGlobalScope?self:{},Prism=function(l){var n=/(?:^|\s)lang(?:uage)?-([\w-]+)(?=\s|$)/i,t=0,e={},j={manual:l.Prism&&l.Prism.manual,disableWorkerMessageHandler:l.Prism&&l.Prism.disableWorkerMessageHandler,util:{encode:function e(t){return t instanceof C?new C(t.type,e(t.content),t.alias):Array.isArray(t)?t.map(e):t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\u00a0/g," ")},type:function(e){return Object.prototype.toString.call(e).slice(8,-1)},objId:function(e){return e.__id||Object.defineProperty(e,"__id",{value:++t}),e.__id},clone:function n(e,a){var r,t;switch(a=a||{},j.util.type(e)){case"Object":if(t=j.util.objId(e),a[t])return a[t];for(var s in r={},a[t]=r,e)e.hasOwnProperty(s)&&(r[s]=n(e[s],a));return r;case"Array":return(t=j.util.objId(e),a[t])?a[t]:(r=[],a[t]=r,e.forEach(function(e,t){r[t]=n(e,a)}),r);default:return e}},getLanguage:function(e){for(;e;){var t=n.exec(e.className);if(t)return t[1].toLowerCase();e=e.parentElement}return"none"},setLanguage:function(e,t){e.className=e.className.replace(RegExp(n,"gi"),""),e.classList.add("language-"+t)},currentScript:function(){if("undefined"==typeof document)return null;if("currentScript"in document)return document.currentScript;try{throw new Error}catch(e){var t=(/at [^(\r\n]*\((.*):[^:]+:[^:]+\)$/i.exec(e.stack)||[])[1];if(t){var n,a=document.getElementsByTagName("script");for(n in a)if(a[n].src==t)return a[n]}return null}},isActive:function(e,t,n){for(var a="no-"+t;e;){var r=e.classList;if(r.contains(t))return!0;if(r.contains(a))return!1;e=e.parentElement}return!!n}},languages:{plain:e,plaintext:e,text:e,txt:e,extend:function(e,t){var n,a=j.util.clone(j.languages[e]);for(n in t)a[n]=t[n];return a},insertBefore:function(n,e,t,a){var r,s=(a=a||j.languages)[n],i={};for(r in s)if(s.hasOwnProperty(r)){if(r==e)for(var o in t)t.hasOwnProperty(o)&&(i[o]=t[o]);t.hasOwnProperty(r)||(i[r]=s[r])}var l=a[n];return a[n]=i,j.languages.DFS(j.languages,function(e,t){t===l&&e!=n&&(this[e]=i)}),i},DFS:function e(t,n,a,r){r=r||{};var s,i,o,l=j.util.objId;for(s in t)t.hasOwnProperty(s)&&(n.call(t,s,t[s],a||s),i=t[s],"Object"!==(o=j.util.type(i))||r[l(i)]?"Array"!==o||r[l(i)]||(r[l(i)]=!0,e(i,n,s,r)):(r[l(i)]=!0,e(i,n,null,r)))}},plugins:{},highlightAll:function(e,t){j.highlightAllUnder(document,e,t)},highlightAllUnder:function(e,t,n){var a={callback:n,container:e,selector:'code[class*="language-"], [class*="language-"] code, code[class*="lang-"], [class*="lang-"] code'};j.hooks.run("before-highlightall",a),a.elements=Array.prototype.slice.apply(a.container.querySelectorAll(a.selector)),j.hooks.run("before-all-elements-highlight",a);for(var r,s=0;r=a.elements[s++];)j.highlightElement(r,!0===t,a.callback)},highlightElement:function(e,t,n){var a=j.util.getLanguage(e),r=j.languages[a],s=(j.util.setLanguage(e,a),e.parentElement);s&&"pre"===s.nodeName.toLowerCase()&&j.util.setLanguage(s,a);var i={element:e,language:a,grammar:r,code:e.textContent};function o(e){i.highlightedCode=e,j.hooks.run("before-insert",i),i.element.innerHTML=i.highlightedCode,j.hooks.run("after-highlight",i),j.hooks.run("complete",i),n&&n.call(i.element)}if(j.hooks.run("before-sanity-check",i),(s=i.element.parentElement)&&"pre"===s.nodeName.toLowerCase()&&!s.hasAttribute("tabindex")&&s.setAttribute("tabindex","0"),!i.code)return j.hooks.run("complete",i),void(n&&n.call(i.element));j.hooks.run("before-highlight",i),i.grammar?t&&l.Worker?((a=new Worker(j.filename)).onmessage=function(e){o(e.data)},a.postMessage(JSON.stringify({language:i.language,code:i.code,immediateClose:!0}))):o(j.highlight(i.code,i.grammar,i.language)):o(j.util.encode(i.code))},highlight:function(e,t,n){e={code:e,grammar:t,language:n};if(j.hooks.run("before-tokenize",e),e.grammar)return e.tokens=j.tokenize(e.code,e.grammar),j.hooks.run("after-tokenize",e),C.stringify(j.util.encode(e.tokens),e.language);throw new Error('The language "'+e.language+'" has no grammar.')},tokenize:function(e,t){var n=t.rest;if(n){for(var a in n)t[a]=n[a];delete t.rest}for(var r=new u,s=(z(r,r.head,e),!function e(t,n,a,r,s,i){for(var o in a)if(a.hasOwnProperty(o)&&a[o]){var l=a[o];l=Array.isArray(l)?l:[l];for(var u=0;u<l.length;++u){if(i&&i.cause==o+","+u)return;for(var g,c=l[u],d=c.inside,p=!!c.lookbehind,m=!!c.greedy,h=c.alias,f=(m&&!c.pattern.global&&(g=c.pattern.toString().match(/[imsuy]*$/)[0],c.pattern=RegExp(c.pattern.source,g+"g")),c.pattern||c),b=r.next,y=s;b!==n.tail&&!(i&&y>=i.reach);y+=b.value.length,b=b.next){var v=b.value;if(n.length>t.length)return;if(!(v instanceof C)){var F,x=1;if(m){if(!(F=L(f,y,t,p))||F.index>=t.length)break;var k=F.index,w=F.index+F[0].length,A=y;for(A+=b.value.length;A<=k;)b=b.next,A+=b.value.length;if(A-=b.value.length,y=A,b.value instanceof C)continue;for(var P=b;P!==n.tail&&(A<w||"string"==typeof P.value);P=P.next)x++,A+=P.value.length;x--,v=t.slice(y,A),F.index-=y}else if(!(F=L(f,0,v,p)))continue;var k=F.index,$=F[0],S=v.slice(0,k),E=v.slice(k+$.length),v=y+v.length,_=(i&&v>i.reach&&(i.reach=v),b.prev),S=(S&&(_=z(n,_,S),y+=S.length),O(n,_,x),new C(o,d?j.tokenize($,d):$,h,$));b=z(n,_,S),E&&z(n,b,E),1<x&&($={cause:o+","+u,reach:v},e(t,n,a,b.prev,y,$),i&&$.reach>i.reach&&(i.reach=$.reach))}}}}}(e,r,t,r.head,0),r),i=[],o=s.head.next;o!==s.tail;)i.push(o.value),o=o.next;return i},hooks:{all:{},add:function(e,t){var n=j.hooks.all;n[e]=n[e]||[],n[e].push(t)},run:function(e,t){var n=j.hooks.all[e];if(n&&n.length)for(var a,r=0;a=n[r++];)a(t)}},Token:C};function C(e,t,n,a){this.type=e,this.content=t,this.alias=n,this.length=0|(a||"").length}function L(e,t,n,a){e.lastIndex=t;t=e.exec(n);return t&&a&&t[1]&&(e=t[1].length,t.index+=e,t[0]=t[0].slice(e)),t}function u(){var e={value:null,prev:null,next:null},t={value:null,prev:e,next:null};e.next=t,this.head=e,this.tail=t,this.length=0}function z(e,t,n){var a=t.next,n={value:n,prev:t,next:a};return t.next=n,a.prev=n,e.length++,n}function O(e,t,n){for(var a=t.next,r=0;r<n&&a!==e.tail;r++)a=a.next;(t.next=a).prev=t,e.length-=r}if(l.Prism=j,C.stringify=function t(e,n){if("string"==typeof e)return e;var a;if(Array.isArray(e))return a="",e.forEach(function(e){a+=t(e,n)}),a;var r,s={type:e.type,content:t(e.content,n),tag:"span",classes:["token",e.type],attributes:{},language:n},e=e.alias,i=(e&&(Array.isArray(e)?Array.prototype.push.apply(s.classes,e):s.classes.push(e)),j.hooks.run("wrap",s),"");for(r in s.attributes)i+=" "+r+'="'+(s.attributes[r]||"").replace(/"/g,"&quot;")+'"';return"<"+s.tag+' class="'+s.classes.join(" ")+'"'+i+">"+s.content+"</"+s.tag+">"},!l.document)return l.addEventListener&&(j.disableWorkerMessageHandler||l.addEventListener("message",function(e){var e=JSON.parse(e.data),t=e.language,n=e.code,e=e.immediateClose;l.postMessage(j.highlight(n,j.languages[t],t)),e&&l.close()},!1)),j;var a,e=j.util.currentScript();function r(){j.manual||j.highlightAll()}return e&&(j.filename=e.src,e.hasAttribute("data-manual")&&(j.manual=!0)),j.manual||("loading"===(a=document.readyState)||"interactive"===a&&e&&e.defer?document.addEventListener("DOMContentLoaded",r):window.requestAnimationFrame?window.requestAnimationFrame(r):window.setTimeout(r,16)),j}(_self);"undefined"!=typeof module&&module.exports&&(module.exports=Prism);"undefined"!=typeof global&&(global.Prism=Prism),Prism.languages.markup={comment:{pattern:/<!--(?:(?!<!--)[\s\S])*?-->/,greedy:!0},prolog:{pattern:/<\?[\s\S]+?\?>/,greedy:!0},doctype:{pattern:/<!DOCTYPE(?:[^>"'[\]]|"[^"]*"|'[^']*')+(?:\[(?:[^<"'\]]|"[^"]*"|'[^']*'|<(?!!--)|<!--(?:[^-]|-(?!->))*-->)*\]\s*)?>/i,greedy:!0,inside:{"internal-subset":{pattern:/(^[^\[]*\[)[\s\S]+(?=\]>$)/,lookbehind:!0,greedy:!0,inside:null},string:{pattern:/"[^"]*"|'[^']*'/,greedy:!0},punctuation:/^<!|>$|[[\]]/,"doctype-tag":/^DOCTYPE/i,name:/[^\s<>'"]+/}},cdata:{pattern:/<!\[CDATA\[[\s\S]*?\]\]>/i,greedy:!0},tag:{pattern:/<\/?(?!\d)[^\s>\/=$<%]+(?:\s(?:\s*[^\s>\/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s'">=]+(?=[\s>]))|(?=[\s/>])))+)?\s*\/?>/,greedy:!0,inside:{tag:{pattern:/^<\/?[^\s>\/]+/,inside:{punctuation:/^<\/?/,namespace:/^[^\s>\/:]+:/}},"special-attr":[],"attr-value":{pattern:/=\s*(?:"[^"]*"|'[^']*'|[^\s'">=]+)/,inside:{punctuation:[{pattern:/^=/,alias:"attr-equals"},{pattern:/^(\s*)["']|["']$/,lookbehind:!0}]}},punctuation:/\/?>/,"attr-name":{pattern:/[^\s>\/]+/,inside:{namespace:/^[^\s>\/:]+:/}}}},entity:[{pattern:/&[\da-z]{1,8};/i,alias:"named-entity"},/&#x?[\da-f]{1,8};/i]},Prism.languages.markup.tag.inside["attr-value"].inside.entity=Prism.languages.markup.entity,Prism.languages.markup.doctype.inside["internal-subset"].inside=Prism.languages.markup,Prism.hooks.add("wrap",function(e){"entity"===e.type&&(e.attributes.title=e.content.replace(/&amp;/,"&"))}),Object.defineProperty(Prism.languages.markup.tag,"addInlined",{value:function(e,t){var n={},n=(n["language-"+t]={pattern:/(^<!\[CDATA\[)[\s\S]+?(?=\]\]>$)/i,lookbehind:!0,inside:Prism.languages[t]},n.cdata=/^<!\[CDATA\[|\]\]>$/i,{"included-cdata":{pattern:/<!\[CDATA\[[\s\S]*?\]\]>/i,inside:n}}),t=(n["language-"+t]={pattern:/[\s\S]+/,inside:Prism.languages[t]},{});t[e]={pattern:RegExp(/(<__[^>]*>)(?:<!\[CDATA\[(?:[^\]]|\](?!\]>))*\]\]>|(?!<!\[CDATA\[)[\s\S])*?(?=<\/__>)/.source.replace(/__/g,function(){return e}),"i"),lookbehind:!0,greedy:!0,inside:n},Prism.languages.insertBefore("markup","cdata",t)}}),Object.defineProperty(Prism.languages.markup.tag,"addAttribute",{value:function(e,t){Prism.languages.markup.tag.inside["special-attr"].push({pattern:RegExp(/(^|["'\s])/.source+"(?:"+e+")"+/\s*=\s*(?:"[^"]*"|'[^']*'|[^\s'">=]+(?=[\s>]))/.source,"i"),lookbehind:!0,inside:{"attr-name":/^[^\s=]+/,"attr-value":{pattern:/=[\s\S]+/,inside:{value:{pattern:/(^=\s*(["']|(?!["'])))\S[\s\S]*(?=\2$)/,lookbehind:!0,alias:[t,"language-"+t],inside:Prism.languages[t]},punctuation:[{pattern:/^=/,alias:"attr-equals"},/"|'/]}}}})}}),Prism.languages.html=Prism.languages.markup,Prism.languages.mathml=Prism.languages.markup,Prism.languages.svg=Prism.languages.markup,Prism.languages.xml=Prism.languages.extend("markup",{}),Prism.languages.ssml=Prism.languages.xml,Prism.languages.atom=Prism.languages.xml,Prism.languages.rss=Prism.languages.xml,function(e){var t=/(?:"(?:\\(?:\r\n|[\s\S])|[^"\\\r\n])*"|'(?:\\(?:\r\n|[\s\S])|[^'\\\r\n])*')/,t=(e.languages.css={comment:/\/\*[\s\S]*?\*\//,atrule:{pattern:RegExp("@[\\w-](?:"+/[^;{\s"']|\s+(?!\s)/.source+"|"+t.source+")*?"+/(?:;|(?=\s*\{))/.source),inside:{rule:/^@[\w-]+/,"selector-function-argument":{pattern:/(\bselector\s*\(\s*(?![\s)]))(?:[^()\s]|\s+(?![\s)])|\((?:[^()]|\([^()]*\))*\))+(?=\s*\))/,lookbehind:!0,alias:"selector"},keyword:{pattern:/(^|[^\w-])(?:and|not|only|or)(?![\w-])/,lookbehind:!0}}},url:{pattern:RegExp("\\burl\\((?:"+t.source+"|"+/(?:[^\\\r\n()"']|\\[\s\S])*/.source+")\\)","i"),greedy:!0,inside:{function:/^url/i,punctuation:/^\(|\)$/,string:{pattern:RegExp("^"+t.source+"$"),alias:"url"}}},selector:{pattern:RegExp("(^|[{}\\s])[^{}\\s](?:[^{};\"'\\s]|\\s+(?![\\s{])|"+t.source+")*(?=\\s*\\{)"),lookbehind:!0},string:{pattern:t,greedy:!0},property:{pattern:/(^|[^-\w\xA0-\uFFFF])(?!\s)[-_a-z\xA0-\uFFFF](?:(?!\s)[-\w\xA0-\uFFFF])*(?=\s*:)/i,lookbehind:!0},important:/!important\b/i,function:{pattern:/(^|[^-a-z0-9])[-a-z0-9]+(?=\()/i,lookbehind:!0},punctuation:/[(){};:,]/},e.languages.css.atrule.inside.rest=e.languages.css,e.languages.markup);t&&(t.tag.addInlined("style","css"),t.tag.addAttribute("style","css"))}(Prism),Prism.languages.clike={comment:[{pattern:/(^|[^\\])\/\*[\s\S]*?(?:\*\/|$)/,lookbehind:!0,greedy:!0},{pattern:/(^|[^\\:])\/\/.*/,lookbehind:!0,greedy:!0}],string:{pattern:/(["'])(?:\\(?:\r\n|[\s\S])|(?!\1)[^\\\r\n])*\1/,greedy:!0},"class-name":{pattern:/(\b(?:class|extends|implements|instanceof|interface|new|trait)\s+|\bcatch\s+\()[\w.\\]+/i,lookbehind:!0,inside:{punctuation:/[.\\]/}},keyword:/\b(?:break|catch|continue|do|else|finally|for|function|if|in|instanceof|new|null|return|throw|try|while)\b/,boolean:/\b(?:false|true)\b/,function:/\b\w+(?=\()/,number:/\b0x[\da-f]+\b|(?:\b\d+(?:\.\d*)?|\B\.\d+)(?:e[+-]?\d+)?/i,operator:/[<>]=?|[!=]=?=?|--?|\+\+?|&&?|\|\|?|[?*/~^%]/,punctuation:/[{}[\];(),.:]/},Prism.languages.javascript=Prism.languages.extend("clike",{"class-name":[Prism.languages.clike["class-name"],{pattern:/(^|[^$\w\xA0-\uFFFF])(?!\s)[_$A-Z\xA0-\uFFFF](?:(?!\s)[$\w\xA0-\uFFFF])*(?=\.(?:constructor|prototype))/,lookbehind:!0}],keyword:[{pattern:/((?:^|\})\s*)catch\b/,lookbehind:!0},{pattern:/(^|[^.]|\.\.\.\s*)\b(?:as|assert(?=\s*\{)|async(?=\s*(?:function\b|\(|[$\w\xA0-\uFFFF]|$))|await|break|case|class|const|continue|debugger|default|delete|do|else|enum|export|extends|finally(?=\s*(?:\{|$))|for|from(?=\s*(?:['"]|$))|function|(?:get|set)(?=\s*(?:[#\[$\w\xA0-\uFFFF]|$))|if|implements|import|in|instanceof|interface|let|new|null|of|package|private|protected|public|return|static|super|switch|this|throw|try|typeof|undefined|var|void|while|with|yield)\b/,lookbehind:!0}],function:/#?(?!\s)[_$a-zA-Z\xA0-\uFFFF](?:(?!\s)[$\w\xA0-\uFFFF])*(?=\s*(?:\.\s*(?:apply|bind|call)\s*)?\()/,number:{pattern:RegExp(/(^|[^\w$])/.source+"(?:"+/NaN|Infinity/.source+"|"+/0[bB][01]+(?:_[01]+)*n?/.source+"|"+/0[oO][0-7]+(?:_[0-7]+)*n?/.source+"|"+/0[xX][\dA-Fa-f]+(?:_[\dA-Fa-f]+)*n?/.source+"|"+/\d+(?:_\d+)*n/.source+"|"+/(?:\d+(?:_\d+)*(?:\.(?:\d+(?:_\d+)*)?)?|\.\d+(?:_\d+)*)(?:[Ee][+-]?\d+(?:_\d+)*)?/.source+")"+/(?![\w$])/.source),lookbehind:!0},operator:/--|\+\+|\*\*=?|=>|&&=?|\|\|=?|[!=]==|<<=?|>>>?=?|[-+*/%&|^!=<>]=?|\.{3}|\?\?=?|\?\.?|[~:]/}),Prism.languages.javascript["class-name"][0].pattern=/(\b(?:class|extends|implements|instanceof|interface|new)\s+)[\w.\\]+/,Prism.languages.insertBefore("javascript","keyword",{regex:{pattern:RegExp(/((?:^|[^$\w\xA0-\uFFFF."'\])\s]|\b(?:return|yield))\s*)/.source+/\//.source+"(?:"+/(?:\[(?:[^\]\\\r\n]|\\.)*\]|\\.|[^/\\\[\r\n])+\/[dgimyus]{0,7}/.source+"|"+/(?:\[(?:[^[\]\\\r\n]|\\.|\[(?:[^[\]\\\r\n]|\\.|\[(?:[^[\]\\\r\n]|\\.)*\])*\])*\]|\\.|[^/\\\[\r\n])+\/[dgimyus]{0,7}v[dgimyus]{0,7}/.source+")"+/(?=(?:\s|\/\*(?:[^*]|\*(?!\/))*\*\/)*(?:$|[\r\n,.;:})\]]|\/\/))/.source),lookbehind:!0,greedy:!0,inside:{"regex-source":{pattern:/^(\/)[\s\S]+(?=\/[a-z]*$)/,lookbehind:!0,alias:"language-regex",inside:Prism.languages.regex},"regex-delimiter":/^\/|\/$/,"regex-flags":/^[a-z]+$/}},"function-variable":{pattern:/#?(?!\s)[_$a-zA-Z\xA0-\uFFFF](?:(?!\s)[$\w\xA0-\uFFFF])*(?=\s*[=:]\s*(?:async\s*)?(?:\bfunction\b|(?:\((?:[^()]|\([^()]*\))*\)|(?!\s)[_$a-zA-Z\xA0-\uFFFF](?:(?!\s)[$\w\xA0-\uFFFF])*)\s*=>))/,alias:"function"},parameter:[{pattern:/(function(?:\s+(?!\s)[_$a-zA-Z\xA0-\uFFFF](?:(?!\s)[$\w\xA0-\uFFFF])*)?\s*\(\s*)(?!\s)(?:[^()\s]|\s+(?![\s)])|\([^()]*\))+(?=\s*\))/,lookbehind:!0,inside:Prism.languages.javascript},{pattern:/(^|[^$\w\xA0-\uFFFF])(?!\s)[_$a-z\xA0-\uFFFF](?:(?!\s)[$\w\xA0-\uFFFF])*(?=\s*=>)/i,lookbehind:!0,inside:Prism.languages.javascript},{pattern:/(\(\s*)(?!\s)(?:[^()\s]|\s+(?![\s)])|\([^()]*\))+(?=\s*\)\s*=>)/,lookbehind:!0,inside:Prism.languages.javascript},{pattern:/((?:\b|\s|^)(?!(?:as|async|await|break|case|catch|class|const|continue|debugger|default|delete|do|else|enum|export|extends|finally|for|from|function|get|if|implements|import|in|instanceof|interface|let|new|null|of|package|private|protected|public|return|set|static|super|switch|this|throw|try|typeof|undefined|var|void|while|with|yield)(?![$\w\xA0-\uFFFF]))(?:(?!\s)[_$a-zA-Z\xA0-\uFFFF](?:(?!\s)[$\w\xA0-\uFFFF])*\s*)\(\s*|\]\s*\(\s*)(?!\s)(?:[^()\s]|\s+(?![\s)])|\([^()]*\))+(?=\s*\)\s*\{)/,lookbehind:!0,inside:Prism.languages.javascript}],constant:/\b[A-Z](?:[A-Z_]|\dx?)*\b/}),Prism.languages.insertBefore("javascript","string",{hashbang:{pattern:/^#!.*/,greedy:!0,alias:"comment"},"template-string":{pattern:/`(?:\\[\s\S]|\$\{(?:[^{}]|\{(?:[^{}]|\{[^}]*\})*\})+\}|(?!\$\{)[^\\`])*`/,greedy:!0,inside:{"template-punctuation":{pattern:/^`|`$/,alias:"string"},interpolation:{pattern:/((?:^|[^\\])(?:\\{2})*)\$\{(?:[^{}]|\{(?:[^{}]|\{[^}]*\})*\})+\}/,lookbehind:!0,inside:{"interpolation-punctuation":{pattern:/^\$\{|\}$/,alias:"punctuation"},rest:Prism.languages.javascript}},string:/[\s\S]+/}},"string-property":{pattern:/((?:^|[,{])[ \t]*)(["'])(?:\\(?:\r\n|[\s\S])|(?!\2)[^\\\r\n])*\2(?=\s*:)/m,lookbehind:!0,greedy:!0,alias:"property"}}),Prism.languages.insertBefore("javascript","operator",{"literal-property":{pattern:/((?:^|[,{])[ \t]*)(?!\s)[_$a-zA-Z\xA0-\uFFFF](?:(?!\s)[$\w\xA0-\uFFFF])*(?=\s*:)/m,lookbehind:!0,alias:"property"}}),Prism.languages.markup&&(Prism.languages.markup.tag.addInlined("script","javascript"),Prism.languages.markup.tag.addAttribute(/on(?:abort|blur|change|click|composition(?:end|start|update)|dblclick|error|focus(?:in|out)?|key(?:down|up)|load|mouse(?:down|enter|leave|move|out|over|up)|reset|resize|scroll|select|slotchange|submit|unload|wheel)/.source,"javascript")),Prism.languages.js=Prism.languages.javascript;
+// Python
+Prism.languages.python={comment:{pattern:/(^|[^\\])#.*/,lookbehind:!0,greedy:!0},"string-interpolation":{pattern:/(?:f|fr|rf)(?:("""|''')[\s\S]*?\1|("|')(?:\\.|(?!\2)[^\\\r\n])*\2)/i,greedy:!0,inside:{interpolation:{pattern:/((?:^|[^{])(?:\{\{)*)\{(?!\{)(?:[^{}]|\{(?!\{)(?:[^{}]|\{(?!\{)(?:[^{}])+\})+\})+\}/,lookbehind:!0,inside:{"format-spec":{pattern:/(:)[^:(){}]+(?=\}$)/,lookbehind:!0},"conversion-option":{pattern:/![sra](?=[:}]$)/,alias:"punctuation"},rest:null}},string:/[\s\S]+/}},"triple-quoted-string":{pattern:/(?:[rub]|br|rb)?("""|''')[\s\S]*?\1/i,greedy:!0,alias:"string"},string:{pattern:/(?:[rub]|br|rb)?("|')(?:\\.|(?!\1)[^\\\r\n])*\1/i,greedy:!0},function:{pattern:/((?:^|\s)def[ \t]+)[a-zA-Z_]\w*(?=\s*\()/g,lookbehind:!0},"class-name":{pattern:/(\bclass\s+)\w+/i,lookbehind:!0},decorator:{pattern:/(^[\t ]*)@\w+(?:\.\w+)*/m,lookbehind:!0,alias:["annotation","punctuation"],inside:{punctuation:/\./}},keyword:/\b(?:_(?=\s*:)|and|as|assert|async|await|break|case|class|continue|def|del|elif|else|except|exec|finally|for|from|global|if|import|in|is|lambda|match|nonlocal|not|or|pass|print|raise|return|try|while|with|yield)\b/,builtin:/\b(?:__import__|abs|all|any|apply|ascii|basestring|bin|bool|buffer|bytearray|bytes|callable|chr|classmethod|cmp|coerce|compile|complex|delattr|dict|dir|divmod|enumerate|eval|execfile|file|filter|float|format|frozenset|getattr|globals|hasattr|hash|help|hex|id|input|int|intern|isinstance|issubclass|iter|len|list|locals|long|map|max|memoryview|min|next|object|oct|open|ord|pow|property|range|raw_input|reduce|reload|repr|reversed|round|set|setattr|slice|sorted|staticmethod|str|sum|super|tuple|type|unichr|unicode|vars|xrange|zip)\b/,boolean:/\b(?:False|None|True)\b/,number:/\b0(?:b(?:_?[01])+|o(?:_?[0-7])+|x(?:_?[a-f0-9])+)\b|(?:\b\d+(?:_\d+)*(?:\.(?:\d+(?:_\d+)*)?)?|\B\.\d+(?:_\d+)*)(?:e[+-]?\d+(?:_\d+)*)?j?(?!\w)/i,operator:/[-+%=]=?|!=|:=|\*\*?=?|\/\/?=?|<[<=>]?|>[=>]?|[&|^~]/,punctuation:/[{}[\];(),.:]/},Prism.languages.python["string-interpolation"].inside.interpolation.inside.rest=Prism.languages.python,Prism.languages.py=Prism.languages.python;
+// JSON
+Prism.languages.json={property:{pattern:/(^|[^\\])"(?:\\.|[^\\"\r\n])*"(?=\s*:)/,lookbehind:!0,greedy:!0},string:{pattern:/(^|[^\\])"(?:\\.|[^\\"\r\n])*"(?!\s*:)/,lookbehind:!0,greedy:!0},comment:{pattern:/\/\/.*|\/\*[\s\S]*?(?:\*\/|$)/,greedy:!0},number:/-?\b\d+(?:\.\d+)?(?:e[+-]?\d+)?\b/i,punctuation:/[{}[\],]/,operator:/:/,boolean:/\b(?:false|true)\b/,null:{pattern:/\bnull\b/,alias:"keyword"}},Prism.languages.webmanifest=Prism.languages.json;
+// TypeScript
+!function(e){e.languages.typescript=e.languages.extend("javascript",{"class-name":{pattern:/(\b(?:class|extends|implements|instanceof|interface|new|type)\s+)(?!keyof\b)(?!\s)[_$a-zA-Z\xA0-\uFFFF](?:(?!\s)[$\w\xA0-\uFFFF])*(?:\s*<(?:[^<>]|<(?:[^<>]|<[^<>]*>)*>)*>)?/,lookbehind:!0,greedy:!0,inside:null},builtin:/\b(?:Array|Function|Promise|any|boolean|console|never|number|string|symbol|unknown)\b/}),e.languages.typescript.keyword.push(/\b(?:abstract|declare|is|keyof|readonly|require)\b/,/\b(?:asserts|infer|interface|module|namespace|type)\b(?=\s*(?:[{_$a-zA-Z\xA0-\uFFFF]|$))/,/\btype\b(?=\s*(?:[\{*]|$))/),delete e.languages.typescript.parameter,delete e.languages.typescript["literal-property"];var s=e.languages.extend("typescript",{});delete s["class-name"],e.languages.typescript["class-name"].inside=s,e.languages.insertBefore("typescript","function",{decorator:{pattern:/@[$\w\xA0-\uFFFF]+/,inside:{at:{pattern:/^@/,alias:"operator"},function:/^[\s\S]+/}},"generic-function":{pattern:/#?(?!\s)[_$a-zA-Z\xA0-\uFFFF](?:(?!\s)[$\w\xA0-\uFFFF])*\s*<(?:[^<>]|<(?:[^<>]|<[^<>]*>)*>)*>(?=\s*\()/,greedy:!0,inside:{function:/^#?(?!\s)[_$a-zA-Z\xA0-\uFFFF](?:(?!\s)[$\w\xA0-\uFFFF])*/,generic:{pattern:/<[\s\S]+/,alias:"class-name",inside:s}}}}),e.languages.ts=e.languages.typescript}(Prism);
+// Bash/Shell
+!function(e){var t="\\b(?:BASH|BASHOPTS|BASH_ALIASES|BASH_ARGC|BASH_ARGV|BASH_CMDS|BASH_COMPLETION_COMPAT_DIR|BASH_LINENO|BASH_REMATCH|BASH_SOURCE|BASH_VERSINFO|BASH_VERSION|COLORTERM|COLUMNS|COMP_WORDBREAKS|DBUS_SESSION_BUS_ADDRESS|DEFAULTS_PATH|DESKTOP_SESSION|DIRSTACK|DISPLAY|EUID|GDMSESSION|GDM_LANG|GNOME_KEYRING_CONTROL|GNOME_KEYRING_PID|GPG_AGENT_INFO|GROUPS|HISTCONTROL|HISTFILE|HISTFILESIZE|HISTSIZE|HOME|HOSTNAME|HOSTTYPE|IFS|INSTANCE|JOB|LANG|LANGUAGE|LC_ADDRESS|LC_ALL|LC_IDENTIFICATION|LC_MEASUREMENT|LC_MONETARY|LC_NAME|LC_NUMERIC|LC_PAPER|LC_TELEPHONE|LC_TIME|LESSCLOSE|LESSOPEN|LINES|LOGNAME|LS_COLORS|MACHTYPE|MAILCHECK|MANDATORY_PATH|NO_AT_BRIDGE|OLDPWD|OPTERR|OPTIND|ORBIT_SOCKETDIR|OSTYPE|PAPERSIZE|PATH|PIPESTATUS|PPID|PS1|PS2|PS3|PS4|PWD|RANDOM|REPLY|SECONDS|SELINUX_INIT|SESSION|SESSIONTYPE|SESSION_MANAGER|SHELL|SHELLOPTS|SHLVL|SSH_AUTH_SOCK|TERM|UID|UPSTART_EVENTS|UPSTART_INSTANCE|UPSTART_JOB|UPSTART_SESSION|USER|WINDOWID|XAUTHORITY|XDG_CONFIG_DIRS|XDG_CURRENT_DESKTOP|XDG_DATA_DIRS|XDG_GREETER_DATA_DIR|XDG_MENU_PREFIX|XDG_RUNTIME_DIR|XDG_SEAT|XDG_SEAT_PATH|XDG_SESSION_DESKTOP|XDG_SESSION_ID|XDG_SESSION_PATH|XDG_SESSION_TYPE|XDG_VTNR|XMODIFIERS)\\b",a={pattern:/(^(["']?)\w+\2)[ \t]+\S.*/,lookbehind:!0,alias:"punctuation",inside:null},n={bash:a,environment:{pattern:RegExp("\\$"+t),alias:"constant"},variable:[{pattern:/\$?\(\([\s\S]+?\)\)/,greedy:!0,inside:{variable:[{pattern:/(^\$\(\([\s\S]+)\)\)/,lookbehind:!0},/^\$\(\(/],number:/\b0x[\dA-Fa-f]+\b|(?:\b\d+(?:\.\d*)?|\B\.\d+)(?:[Ee]-?\d+)?/,operator:/--|\+\+|\*\*=?|<<=?|>>=?|&&|\|\||[=!+\-*/%<>^&|]=?|[?~:]/,punctuation:/\(\(?|\)\)?|,|;/}},{pattern:/\$\((?:\([^)]+\)|[^()])+\)|`[^`]+`/,greedy:!0,inside:{variable:/^\$\(|^`|\)$|`$/}},{pattern:/\$\{[^}]+\}/,greedy:!0,inside:{operator:/:[-=?+]?|[!\/]|##?|%%?|\^\^?|,,?/,punctuation:/[\[\]]/,environment:{pattern:RegExp("(\\{)"+t),lookbehind:!0,alias:"constant"}}},/\$(?:\w+|[#?*!@$])/],entity:/\\(?:[abceEfnrtv\\"]|O?[0-7]{1,3}|U[0-9a-fA-F]{8}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{1,2})/};e.languages.bash={shebang:{pattern:/^#!\s*\/.*/,alias:"important"},comment:{pattern:/(^|[^"{\\$])#.*/,lookbehind:!0},"function-name":[{pattern:/(\bfunction\s+)[\w-]+(?=(?:\s*\(?:\s*\))?\s*\{)/,lookbehind:!0,alias:"function"},{pattern:/\b[\w-]+(?=\s*\(\s*\)\s*\{)/,alias:"function"}],"for-or-select":{pattern:/(\b(?:for|select)\s+)\w+(?=\s+in\s)/,alias:"variable",lookbehind:!0},"assign-left":{pattern:/(^|[\s;|&]|[<>]\()\w+(?:\.\w+)*(?=\+?=)/,inside:{environment:{pattern:RegExp("(^|[\\s;|&]|[<>]\\()"+t),lookbehind:!0,alias:"constant"}},alias:"variable",lookbehind:!0},parameter:{pattern:/(^|\s)-{1,2}(?:\w+:[+-]?)?\w+(?:\.\w+)*(?=[=\s]|$)/,alias:"variable",lookbehind:!0},string:[{pattern:/((?:^|[^<])<<-?\s*)(\w+)\s[\s\S]*?(?:\r?\n|\r)\2/,lookbehind:!0,greedy:!0,inside:n},{pattern:/((?:^|[^<])<<-?\s*)(["'])(\w+)\2\s[\s\S]*?(?:\r?\n|\r)\3/,lookbehind:!0,greedy:!0,inside:{bash:a}},{pattern:/(^|[^\\](?:\\\\)*)"(?:\\[\s\S]|\$\([^)]+\)|\$(?!\()|`[^`]+`|[^"\\`$])*"/,lookbehind:!0,greedy:!0,inside:n},{pattern:/(^|[^$\\])'[^']*'/,lookbehind:!0,greedy:!0},{pattern:/\$'(?:[^'\\]|\\[\s\S])*'/,greedy:!0,inside:{entity:n.entity}}],environment:{pattern:RegExp("\\$?"+t),alias:"constant"},variable:n.variable,function:{pattern:/(^|[\s;|&]|[<>]\()(?:add|apropos|apt|apt-cache|apt-get|aptitude|aspell|automysqlbackup|awk|basename|bash|bc|bconsole|bg|bzip2|cal|cargo|cat|cfdisk|chgrp|chkconfig|chmod|chown|chroot|cksum|clear|cmp|column|comm|composer|cp|cron|crontab|csplit|curl|cut|date|dc|dd|ddrescue|debootstrap|df|diff|diff3|dig|dir|dircolors|dirname|dirs|dmesg|docker|docker-compose|du|egrep|eject|env|ethtool|expand|expect|expr|fdformat|fdisk|fg|fgrep|file|find|fmt|fold|format|free|fsck|ftp|fuser|gawk|git|gparted|grep|groupadd|groupdel|groupmod|groups|grub-mkconfig|gzip|halt|head|hg|history|host|hostname|htop|iconv|id|ifconfig|ifdown|ifup|import|install|ip|java|jobs|join|kill|killall|less|link|ln|locate|logname|logrotate|look|lpc|lpr|lprint|lprintd|lprintq|lprm|ls|lsof|lynx|make|man|mc|mdadm|mkconfig|mkdir|mke2fs|mkfifo|mkfs|mkisofs|mknod|mkswap|mmv|more|most|mount|mtools|mtr|mutt|mv|nano|nc|netstat|nice|nl|node|nohup|notify-send|npm|nslookup|op|open|parted|passwd|paste|pathchk|ping|pkill|pnpm|podman|podman-compose|popd|pr|printcap|printenv|ps|pushd|pv|quota|quotacheck|quotactl|ram|rar|rcp|reboot|remsync|rename|renice|rev|rm|rmdir|rpm|rsync|scp|screen|sdiff|sed|sendmail|seq|service|sftp|sh|shellcheck|shuf|shutdown|sleep|slocate|sort|split|ssh|stat|strace|su|sudo|sum|suspend|swapon|sync|sysctl|tac|tail|tar|tee|time|timeout|top|touch|tr|traceroute|tsort|tty|umount|uname|unexpand|uniq|units|unrar|unshar|unzip|update-grub|uptime|useradd|userdel|usermod|users|uudecode|uuencode|v|vcpkg|vdir|vi|vim|virsh|vmstat|wait|watch|wc|wget|whereis|which|who|whoami|write|xargs|xdg-open|yarn|yes|zenity|zip|zsh|zypper)(?=$|[)\s;|&])/,lookbehind:!0},keyword:{pattern:/(^|[\s;|&]|[<>]\()(?:case|do|done|elif|else|esac|fi|for|function|if|in|select|then|until|while)(?=$|[)\s;|&])/,lookbehind:!0},builtin:{pattern:/(^|[\s;|&]|[<>]\()(?:\.|:|alias|bind|break|builtin|caller|cd|command|continue|declare|echo|enable|eval|exec|exit|export|getopts|hash|help|let|local|logout|mapfile|printf|pwd|read|readarray|readonly|return|set|shift|shopt|source|test|times|trap|type|typeset|ulimit|umask|unalias|unset)(?=$|[)\s;|&])/,lookbehind:!0,alias:"class-name"},boolean:{pattern:/(^|[\s;|&]|[<>]\()(?:false|true)(?=$|[)\s;|&])/,lookbehind:!0},"file-descriptor":{pattern:/\B&\d\b/,alias:"important"},operator:{pattern:/\d?<>|>\||\+=|=[=~]?|!=?|<<[<-]?|[&\d]?>>|\d[<>]&?|[<>][&=]?|&[>&]?|\|[&|]?/,inside:{"file-descriptor":{pattern:/^\d/,alias:"important"}}},punctuation:/\$?\(\(?|\)\)?|\.\.|[{}[\];\\]/,number:{pattern:/(^|\s)(?:[1-9]\d*|0)(?:[.,]\d+)?\b/,lookbehind:!0}},a.inside=e.languages.bash;for(var s=["comment","function-name","for-or-select","assign-left","parameter","string","environment","function","keyword","builtin","boolean","file-descriptor","operator","punctuation","number"],o=n.variable[1].inside,i=0;i<s.length;i++)o[s[i]]=e.languages.bash[s[i]];e.languages.sh=e.languages.bash,e.languages.shell=e.languages.bash}(Prism);
+
+// ============================================================
+// App logic
+// ============================================================
+
+  const LIMITS = { free: 2000, nitro: 4000 };
+  const AVATAR_COLORS = ['#5865f2','#eb459e','#57f287','#fee75c','#ed4245','#00a8fc','#ff7043','#ab47bc'];
+  // OGP fetching relies on CORS-friendly proxies; keep a small cache with TTL so transient
+  // proxy failures don't permanently "stick" until a full page refresh.
+  const ogpCache = {};
+  const OGP_CACHE_TTL_OK_MS = 10 * 60 * 1000;
+  // "No OGP" is often a false negative due to bot-blocking / JS shells. Keep it short.
+  const OGP_CACHE_TTL_NO_OGP_MS = 60 * 1000;
+  const OGP_CACHE_TTL_ERROR_MS = 20 * 1000;
+  const OGP_PROXIES = [
+    { name: 'direct', build: (u) => u },
+    { name: 'codetabs', build: (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}` },
+    { name: 'allorigins', build: (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}` },
+    { name: 'jina', build: (u) => `https://r.jina.ai/${u}` },
+  ];
+
+  function getOgpCacheEntry(url) {
+    const entry = ogpCache[url];
+    if (!entry) return null;
+    if (typeof entry.expiresAt === 'number' && Date.now() > entry.expiresAt) {
+      delete ogpCache[url];
+      return null;
+    }
+    return entry;
+  }
+
+  function setOgpCache(url, value, ttlMs) {
+    ogpCache[url] = { value, expiresAt: Date.now() + ttlMs };
+  }
+
+  function resolveMaybeRelativeUrl(maybeUrl, baseUrl) {
+    const s = (maybeUrl || '').trim();
+    if (!s) return '';
+    try {
+      if (s.startsWith('data:')) return s;
+      return new URL(s, baseUrl).href;
+    } catch {
+      return '';
+    }
+  }
+
+  function buildOgpProxyUrl(targetUrl) {
+    // Image hotlink protection sometimes blocks direct loads. Use a proxy as a fallback.
+    return `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`;
+  }
+
+  function isVolatileOgpHost(inputUrl) {
+    try {
+      const host = (new URL(inputUrl)).hostname.toLowerCase();
+      return (
+        host === 'x.com' || host.endsWith('.x.com') ||
+        host === 'twitter.com' || host.endsWith('.twitter.com') ||
+        host === 'fixupx.com' || host.endsWith('.fixupx.com') ||
+        host === 'fxtwitter.com' || host.endsWith('.fxtwitter.com')
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  function rewriteUrlForOgpFetch(inputUrl) {
+    // X/Twitter frequently blocks scraping and returns JS-only shells.
+    // FxEmbed family domains return stable OG/Twitter meta for embeds.
+    // - x.com -> fixupx.com
+    // - twitter.com -> fxtwitter.com
+    try {
+      const u = new URL(inputUrl);
+      const host = u.hostname.toLowerCase();
+      if (host === 'x.com' || host.endsWith('.x.com')) {
+        u.hostname = 'fixupx.com';
+        return { fetchUrl: u.href, canonicalUrl: inputUrl, rewritten: true, provider: 'fixupx' };
+      }
+      if (host === 'twitter.com' || host.endsWith('.twitter.com')) {
+        u.hostname = 'fxtwitter.com';
+        return { fetchUrl: u.href, canonicalUrl: inputUrl, rewritten: true, provider: 'fxtwitter' };
+      }
+      return { fetchUrl: inputUrl, canonicalUrl: inputUrl, rewritten: false, provider: '' };
+    } catch {
+      return { fetchUrl: inputUrl, canonicalUrl: inputUrl, rewritten: false, provider: '' };
+    }
+  }
+  let ogpEnabled = true;
+  let lang = 'ja';
+  let state = { messages: [], nextId: 0 };
+
+// ---- i18n ----
+const STRINGS = {
+  ja: {
+    channel: 'チャンネル', showHeader: 'ヘッダー表示', ogpPreview: 'OGPプレビュー',
+    announce: '📢 アナウンス', announceBadge: 'アナウンス',
+    addMessage: '＋ メッセージを追加',
+    emptyHint: 'メッセージを入力するとプレビューが表示されます',
+    datetime: '日時', timezone: 'タイムゾーン', now: '今すぐ',
+    copy: 'コピー', copied: 'コピー済み',
+    namePlaceholder: 'ユーザー名', msgPlaceholder: 'メッセージを入力…',
+    up: '↑', down: '↓', del: '✕',
+    tsParseError: '日時の解析に失敗しました',
+    tsLabels: { t:'短い時刻', T:'長い時刻', d:'短い日付', D:'長い日付', f:'短い日時', F:'長い日時（曜日付き）', R:'相対時間' },
+  },
+  en: {
+    channel: 'Channel', showHeader: 'Show Header', ogpPreview: 'OGP Preview',
+    announce: '📢 Announce', announceBadge: 'Announce',
+    addMessage: '+ Add Message',
+    emptyHint: 'Type a message to see the preview',
+    datetime: 'Date/Time', timezone: 'Timezone', now: 'Now',
+    copy: 'Copy', copied: 'Copied!',
+    namePlaceholder: 'Username', msgPlaceholder: 'Enter message…',
+    up: '↑', down: '↓', del: '✕',
+    tsParseError: 'Failed to parse date/time',
+    tsLabels: { t:'Short Time', T:'Long Time', d:'Short Date', D:'Long Date', f:'Short Date/Time', F:'Long Date/Time', R:'Relative' },
+  },
+};
+
+function t(key) { return STRINGS[lang][key] ?? key; }
+
+function applyLang() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll('.msg-name-input').forEach(el => el.placeholder = t('namePlaceholder'));
+  document.querySelectorAll('.msg-textarea').forEach(el => el.placeholder = t('msgPlaceholder'));
+  document.querySelectorAll('.ts-copy-btn:not(.copied)').forEach(el => el.textContent = t('copy'));
+  document.querySelectorAll('[data-ctrl]').forEach(el => el.textContent = t(el.dataset.ctrl));
+  updateTsFormats();
+}
+
+// ---- Utilities ----
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+function escAttr(s) { return escHtml(s); }
+
+function clamp(n, min, max) { return Math.min(max, Math.max(min, n)); }
+
+function autoGrowTextarea(ta) {
+  if (!ta) return;
+  ta.style.height = 'auto';
+  ta.style.height = `${ta.scrollHeight}px`;
+}
+
+function initColumnResizer() {
+  const container = document.getElementById('tab-preview');
+  const left = container ? container.querySelector('.panel-input') : null;
+  const resizer = document.getElementById('col-resizer');
+  if (!container || !left || !resizer) return;
+
+  const mq = window.matchMedia('(max-width: 680px)');
+  const key = 'discorddraft:inputPanelWidthPx';
+
+  const getBounds = () => {
+    const total = container.getBoundingClientRect().width;
+    const resizerW = resizer.getBoundingClientRect().width || 6;
+    const minLeft = 280;
+    const minRight = 320;
+    const maxLeft = Math.max(minLeft, total - minRight - resizerW);
+    return { minLeft, maxLeft };
+  };
+
+  const setLeftPx = (px) => {
+    const { minLeft, maxLeft } = getBounds();
+    const clamped = clamp(Math.round(px), minLeft, maxLeft);
+    container.style.setProperty('--input-panel-width', `${clamped}px`);
+    return clamped;
+  };
+
+  const applySaved = () => {
+    const raw = localStorage.getItem(key);
+    const px = parseInt(raw || '', 10);
+    if (!Number.isFinite(px) || px <= 0) return;
+    setLeftPx(px);
+  };
+
+  applySaved();
+
+  resizer.addEventListener('pointerdown', (e) => {
+    if (mq.matches) return;
+    if (e.button !== 0) return;
+    e.preventDefault();
+
+    const startX = e.clientX;
+    const startW = left.getBoundingClientRect().width;
+    document.body.classList.add('resizing');
+    resizer.setPointerCapture(e.pointerId);
+
+    const onMove = (ev) => {
+      const dx = ev.clientX - startX;
+      setLeftPx(startW + dx);
+    };
+    const onUp = () => {
+      document.body.classList.remove('resizing');
+      resizer.removeEventListener('pointermove', onMove);
+      resizer.removeEventListener('pointerup', onUp);
+      resizer.removeEventListener('pointercancel', onUp);
+      const w = left.getBoundingClientRect().width;
+      localStorage.setItem(key, String(Math.round(w)));
+    };
+
+    resizer.addEventListener('pointermove', onMove);
+    resizer.addEventListener('pointerup', onUp);
+    resizer.addEventListener('pointercancel', onUp);
+  });
+
+  // Keyboard resize when focused (optional, but helps accessibility).
+  resizer.tabIndex = 0;
+  resizer.addEventListener('keydown', (e) => {
+    if (mq.matches) return;
+    const step = e.shiftKey ? 40 : 20;
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const cur = left.getBoundingClientRect().width;
+    const next = setLeftPx(cur + (e.key === 'ArrowRight' ? step : -step));
+    localStorage.setItem(key, String(next));
+  });
+
+  window.addEventListener('resize', () => {
+    if (mq.matches) return;
+    applySaved();
+  });
+}
+
+function formatMsgTime() {
+  const now = new Date();
+  return `今日 ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+}
+
+function avatarInitial(name) {
+  return (name || '?').trim().charAt(0).toUpperCase();
+}
+function avatarColor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+
+// ---- Markdown parser ----
+
+function renderCodeBlock(lang, code) {
+  const safeCode = escHtml(code);
+  const grammar = Prism.languages[lang] || Prism.languages[lang.toLowerCase()];
+  let highlighted;
+  if (grammar) {
+    try { highlighted = Prism.highlight(code, grammar, lang); }
+    catch(e) { highlighted = safeCode; }
+  } else {
+    highlighted = safeCode;
+  }
+  const langLabel = lang ? `<div class="dc-codeblock-lang">${escHtml(lang)}</div>` : '';
+  return `<div class="dc-codeblock">${langLabel}<pre><code class="language-${escAttr(lang)}">${highlighted}</code></pre></div>`;
+}
+
+function renderDiscordTimestamp(unix, fmt) {
+  const date = new Date(unix * 1000);
+  const locale = 'ja-JP';
+  let text;
+  if (fmt === 'R') {
+    text = formatRelative(unix);
+  } else {
+    const opts = {
+      't': { hour: '2-digit', minute: '2-digit' },
+      'T': { hour: '2-digit', minute: '2-digit', second: '2-digit' },
+      'd': { year: 'numeric', month: '2-digit', day: '2-digit' },
+      'D': { year: 'numeric', month: 'long', day: 'numeric' },
+      'f': { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' },
+      'F': { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' },
+    }[fmt] || { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+    try { text = new Intl.DateTimeFormat(locale, opts).format(date); }
+    catch(e) { text = date.toLocaleString(); }
+  }
+  return `<span class="dc-ts-pill" title="${escAttr(date.toISOString())}">${escHtml(text)}</span>`;
+}
+
+function formatRelative(unix) {
+  const diffSec = Math.round(Date.now() / 1000 - unix);
+  const abs = Math.abs(diffSec);
+  const future = diffSec < 0;
+  let val, unit;
+  if (abs < 45)       { val = abs; unit = '秒'; }
+  else if (abs < 2700)  { val = Math.round(abs/60);  unit = '分'; }
+  else if (abs < 64800) { val = Math.round(abs/3600); unit = '時間'; }
+  else if (abs < 172800){ val = Math.round(abs/86400); unit = '日'; }
+  else if (abs < 2678400){ val = Math.round(abs/86400/30); unit = 'ヶ月'; }
+  else                  { val = Math.round(abs/86400/365); unit = '年'; }
+  return future ? `${val}${unit}後` : `${val}${unit}前`;
+}
+
+function parseInline(text, suppressedOgpUrls, ogpUrls) {
+  const tokens = [];
+  function protect(html) {
+    tokens.push(html);
+    return `\x00${tokens.length - 1}\x00`;
+  }
+
+  // 1. Inline code
+  text = text.replace(/`([^`\n]+)`/g, (_, code) =>
+    protect(`<code class="dc-inline-code">${escHtml(code)}</code>`)
+  );
+
+  // 2. Discord timestamps (before HTML escape)
+  text = text.replace(/<t:(\d+)(?::([tTdDfFR]))?>/g, (_, ts, fmt) =>
+    protect(renderDiscordTimestamp(parseInt(ts), fmt || 'f'))
+  );
+
+  // 3. Markdown links: [text](url) / [text](<url>)
+  // Note: Discord doesn't support masked links in normal messages, but this tool does.
+  text = text.replace(/\[([^\]\n]+)\]\(\s*(<)?(https?:\/\/[^\s>]+)(?:>)?\s*\)/g, (_, label, angle, url) => {
+    const suppress = !!angle;
+    if (suppress) suppressedOgpUrls.add(url);
+    else ogpUrls.push(url);
+    const cls = suppress ? 'dc-link' : 'dc-link ogp-trigger';
+    const data = suppress ? '' : ` data-url="${escAttr(url)}"`;
+    return protect(`<a class="${cls}" href="${escAttr(url)}" target="_blank" rel="noopener noreferrer"${data}>${escHtml(label)}</a>`);
+  });
+
+  // 4. <URL> suppress-OGP links
+  text = text.replace(/<(https?:\/\/[^\s>]+)>/g, (_, url) => {
+    suppressedOgpUrls.add(url);
+    return protect(`<a class="dc-link" href="${escAttr(url)}" target="_blank" rel="noopener noreferrer">${escHtml(url)}</a>`);
+  });
+
+  // 5. Plain URLs (collect for OGP)
+  text = text.replace(/https?:\/\/[^\s<>"'`]+/g, (url) => {
+    // trim trailing punctuation
+    url = url.replace(/[.,;!?)]+$/, '');
+    ogpUrls.push(url);
+    return protect(`<a class="dc-link ogp-trigger" href="${escAttr(url)}" target="_blank" rel="noopener noreferrer" data-url="${escAttr(url)}">${escHtml(url)}</a>`);
+  });
+
+  // 6. Escape remaining HTML
+  text = escHtml(text);
+
+  // 7. Spoiler
+  text = text.replace(/\|\|(.+?)\|\|/gs, (_, c) =>
+    protect(`<span class="dc-spoiler" onclick="this.classList.toggle('revealed')">${c}</span>`)
+  );
+
+  // 8. Bold+Italic
+  text = text.replace(/\*\*\*(.+?)\*\*\*/gs, (_, c) => protect(`<strong><em>${c}</em></strong>`));
+
+  // 9. Bold
+  text = text.replace(/\*\*(.+?)\*\*/gs, (_, c) => protect(`<strong>${c}</strong>`));
+
+  // 10. Underline+Italic
+  text = text.replace(/___(.+?)___/gs, (_, c) => protect(`<u><em>${c}</em></u>`));
+
+  // 11. Underline
+  text = text.replace(/__(.+?)__/gs, (_, c) => protect(`<u>${c}</u>`));
+
+  // 12. Italic *
+  text = text.replace(/\*([^*\n]+)\*/g, (_, c) => protect(`<em>${c}</em>`));
+
+  // 13. Italic _ (word boundary)
+  text = text.replace(/(?<![\\w])_([^_\n]+)_(?![\\w])/g, (_, c) => protect(`<em>${c}</em>`));
+
+  // 14. Strikethrough
+  text = text.replace(/~~(.+?)~~/gs, (_, c) => protect(`<s>${c}</s>`));
+
+  // 15. @mentions
+  text = text.replace(/@(\w+)/g, (_, n) => protect(`<span class="dc-mention">@${n}</span>`));
+
+  // 16. #channels
+  text = text.replace(/#([\w-]+)/g, (_, n) => protect(`<span class="dc-channel-mention">#${n}</span>`));
+
+  // Restore tokens
+  text = text.replace(/\x00(\d+)\x00/g, (_, i) => tokens[+i]);
+  return text;
+}
+
+function parseMarkdown(text) {
+  // Extract code blocks first
+  const codeBlocks = [];
+  const CB = '\x01';
+  text = text.replace(/```(\w*)\r?\n?([\s\S]*?)```/g, (_, lang, code) => {
+    codeBlocks.push({ lang: lang.trim(), code: code.replace(/\n$/, '') });
+    return `${CB}${codeBlocks.length - 1}${CB}`;
+  });
+
+  const suppressedOgpUrls = new Set();
+  const allOgpUrls = [];
+
+  function inline(s) {
+    return parseInline(s, suppressedOgpUrls, allOgpUrls);
+  }
+
+  const lines = text.split('\n');
+  let html = '';
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Code block placeholder
+    const cbm = line.match(/^\x01(\d+)\x01$/);
+    if (cbm) {
+      const { lang, code } = codeBlocks[+cbm[1]];
+      html += renderCodeBlock(lang, code);
+      i++; continue;
+    }
+
+    // Multi-line blockquote >>>
+    if (line.startsWith('>>> ')) {
+      const qlines = [line.slice(4)];
+      i++;
+      while (i < lines.length) { qlines.push(lines[i]); i++; }
+      html += `<div class="dc-blockquote"><div class="dc-quote-bar"></div><div class="dc-quote-content">${inline(qlines.join('\n'))}</div></div>`;
+      continue;
+    }
+
+    // Single blockquote >
+    if (line.startsWith('> ')) {
+      html += `<div class="dc-blockquote"><div class="dc-quote-bar"></div><div class="dc-quote-content">${inline(line.slice(2))}</div></div>`;
+      i++; continue;
+    }
+
+    // Headings
+    if (line.startsWith('### ')) { html += `<h3 class="dc-h3">${inline(line.slice(4))}</h3>`; i++; continue; }
+    if (line.startsWith('## '))  { html += `<h2 class="dc-h2">${inline(line.slice(3))}</h2>`; i++; continue; }
+    if (line.startsWith('# '))   { html += `<h1 class="dc-h1">${inline(line.slice(2))}</h1>`; i++; continue; }
+
+    // Subtext -#
+    if (line.startsWith('-# ')) {
+      html += `<span class="dc-subtext">${inline(line.slice(3))}</span><br>`;
+      i++; continue;
+    }
+
+    // Unordered list (with nesting via 2-space indent)
+    if (/^( {2})*[-*] /.test(line)) {
+      function buildUl(lines, startIdx, baseIndent) {
+        let idx = startIdx, out = '<ul class="dc-ul">';
+        while (idx < lines.length) {
+          const m = lines[idx].match(/^( {2})*[-*] /);
+          if (!m) break;
+          const indent = (lines[idx].match(/^( *)/)[1].length / 2);
+          if (indent < baseIndent) break;
+          if (indent > baseIndent) { const [sub, ni] = buildUl(lines, idx, indent); out += sub; idx = ni; continue; }
+          out += `<li>${inline(lines[idx].replace(/^( {2})*[-*] /, ''))}</li>`;
+          idx++;
+        }
+        return [out + '</ul>', idx];
+      }
+      const baseIndent = (line.match(/^( *)/)[1].length / 2);
+      const [listHtml, ni] = buildUl(lines, i, baseIndent);
+      html += listHtml;
+      i = ni;
+      continue;
+    }
+
+    // Ordered list (with nesting via 2-space indent)
+    if (/^( {2})*\d+\. /.test(line)) {
+      function buildOl(lines, startIdx, baseIndent) {
+        let idx = startIdx, out = '';
+        const startNum = parseInt(lines[startIdx].replace(/^( {2})*/, '').match(/^(\d+)/)[1]);
+        out = `<ol class="dc-ol" start="${startNum}">`;
+        while (idx < lines.length) {
+          const m = lines[idx].match(/^( {2})*\d+\. /);
+          if (!m) break;
+          const indent = (lines[idx].match(/^( *)/)[1].length / 2);
+          if (indent < baseIndent) break;
+          if (indent > baseIndent) { const [sub, ni] = buildOl(lines, idx, indent); out += sub; idx = ni; continue; }
+          out += `<li>${inline(lines[idx].replace(/^( {2})*\d+\. /, ''))}</li>`;
+          idx++;
+        }
+        return [out + '</ol>', idx];
+      }
+      const baseIndent = (line.match(/^( *)/)[1].length / 2);
+      const [listHtml, ni] = buildOl(lines, i, baseIndent);
+      html += listHtml;
+      i = ni;
+      continue;
+    }
+
+    // Empty line
+    if (line.trim() === '') { html += '<br>'; i++; continue; }
+
+    // Normal text
+    html += `<div>${inline(line)}</div>`;
+    i++;
+  }
+
+  return {
+    html,
+    ogpUrls: allOgpUrls.filter(u => !suppressedOgpUrls.has(u)),
+  };
+}
+
+// ---- OGP ----
+async function fetchOGP(url) {
+  const cached = getOgpCacheEntry(url);
+  if (cached) {
+    console.debug('[OGP] cache hit:', url, cached.value ? 'OK' : 'null');
+    return cached.value;
+  }
+
+  const rewritten = rewriteUrlForOgpFetch(url);
+  if (rewritten.rewritten) {
+    console.log('[OGP] fetching (rewritten):', url, '→', rewritten.fetchUrl, `(${rewritten.provider})`);
+  } else {
+    console.log('[OGP] fetching:', url);
+  }
+
+  const baseUrl = (() => { try { return new URL(rewritten.fetchUrl).href; } catch { return rewritten.fetchUrl; } })();
+
+  const tryParse = (htmlStr) => {
+    if (!htmlStr) return null;
+    const doc = new DOMParser().parseFromString(htmlStr, 'text/html');
+    const g = (p) => {
+      const el = doc.querySelector(`meta[property="${p}"],meta[name="${p}"]`);
+      return el ? (el.getAttribute('content') || '').trim() : '';
+    };
+
+    const rawTitle = g('og:title') || g('twitter:title') || (doc.title || '').trim();
+    const rawDesc = g('og:description') || g('twitter:description') || g('description');
+    const rawImage =
+      g('og:image') ||
+      g('og:image:secure_url') ||
+      g('twitter:image') ||
+      g('twitter:image:src');
+    const rawUrl = g('og:url') || baseUrl;
+
+    const resolvedUrl = resolveMaybeRelativeUrl(rawUrl, baseUrl) || baseUrl;
+    const resolvedImage = resolveMaybeRelativeUrl(rawImage, baseUrl);
+
+    let site = g('og:site_name');
+    if (!site) {
+      try { site = (new URL(resolvedUrl)).hostname; } catch { site = ''; }
+    }
+
+    const result = {
+      title: rawTitle,
+      desc: rawDesc,
+      image: resolvedImage,
+      site,
+      // Prefer original URL for the clickable title, even if we fetched via an embed helper domain.
+      url: rewritten.canonicalUrl || resolvedUrl,
+    };
+
+    // If we got nothing usable, treat it as "no-ogp" (but only after all proxies are tried).
+    if (!result.title && !result.image) return null;
+    return result;
+  };
+
+  // Try direct fetch (works only when CORS allows), then fall back to public proxies.
+  let lastError = null;
+  for (const proxy of OGP_PROXIES) {
+    const fetchUrl = proxy.build(rewritten.fetchUrl);
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+      const resp = await fetch(fetchUrl, { signal: controller.signal });
+      clearTimeout(timer);
+
+      if (!resp.ok) {
+        // Don't negative-cache hard on transient proxy issues; move on to the next proxy.
+        console.warn('[OGP] fetch HTTP error:', resp.status, 'via', proxy.name, url);
+        lastError = new Error(`HTTP ${resp.status}`);
+        continue;
+      }
+
+      const htmlStr = await resp.text();
+      console.debug('[OGP] response length:', htmlStr.length, 'chars via', proxy.name, 'for', url);
+      const parsed = tryParse(htmlStr);
+      if (parsed) {
+        console.log('[OGP] parsed:', { title: parsed.title, image: parsed.image, site: parsed.site, via: proxy.name });
+        setOgpCache(url, parsed, OGP_CACHE_TTL_OK_MS);
+        return parsed;
+      }
+
+      // If this proxy returns non-empty HTML but no title/image, try the next proxy.
+      if (htmlStr) {
+        console.warn('[OGP] no title/image via', proxy.name, 'for', url);
+      } else {
+        console.warn('[OGP] empty response via', proxy.name, 'for', url);
+        lastError = new Error('empty response');
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') {
+        console.warn('[OGP] timeout (10s) via', proxy.name, 'for', url);
+        lastError = e;
+        continue;
+      }
+      console.warn('[OGP] fetch error via', proxy.name, ':', e && e.name, e && e.message, url);
+      lastError = e;
+      continue;
+    }
+  }
+
+  // If everything failed, cache null briefly to avoid spamming while typing.
+  const ttl = (lastError || isVolatileOgpHost(rewritten.fetchUrl) || isVolatileOgpHost(url))
+    ? OGP_CACHE_TTL_ERROR_MS
+    : OGP_CACHE_TTL_NO_OGP_MS;
+  setOgpCache(url, null, ttl);
+  return null;
+}
+
+function renderOGPCard(ogp, url) {
+  if (!ogp) return '';
+  const directImg = ogp.image ? ogp.image : '';
+  const proxyImg = directImg ? buildOgpProxyUrl(directImg) : '';
+  const imgHtml = directImg
+    ? `<img class="ogp-image" src="${escAttr(directImg)}" data-proxy="${escAttr(proxyImg)}" alt="" loading="lazy"
+         onerror="if(this.dataset.proxy){this.src=this.dataset.proxy;this.dataset.proxy='';}else{this.style.display='none';}">`
+    : '';
+  return `<div class="ogp-card">
+    <div class="ogp-card-body">
+      <div class="ogp-site">${escHtml(ogp.site)}</div>
+      <a class="ogp-title" href="${escAttr(ogp.url)}" target="_blank" rel="noopener noreferrer">${escHtml(ogp.title)}</a>
+      ${ogp.desc ? `<div class="ogp-desc">${escHtml(ogp.desc)}</div>` : ''}
+    </div>
+    ${imgHtml}
+  </div>`;
+}
+
+// ---- Message state management ----
+function createMessage() {
+  const id = state.nextId++;
+  return { id, name: 'ユーザー', color: AVATAR_COLORS[id % AVATAR_COLORS.length], text: '', plan: 'free' };
+}
+
+function addMessage() {
+  const msg = createMessage();
+  state.messages.push(msg);
+  renderEditors();
+  renderPreview();
+  // Focus new textarea and scroll it into view
+  setTimeout(() => {
+    const ta = document.querySelector(`[data-id="${msg.id}"] .msg-textarea`);
+    if (ta) {
+      ta.focus();
+      ta.closest('.message-editor').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, 50);
+}
+
+function removeMessage(id) {
+  state.messages = state.messages.filter(m => m.id !== id);
+  renderEditors();
+  renderPreview();
+}
+
+function moveMessage(id, dir) {
+  const idx = state.messages.findIndex(m => m.id === id);
+  const to = idx + dir;
+  if (to < 0 || to >= state.messages.length) return;
+  [state.messages[idx], state.messages[to]] = [state.messages[to], state.messages[idx]];
+  renderEditors();
+  renderPreview();
+}
+
+// ---- Render editors ----
+function renderEditors() {
+  const list = document.getElementById('message-list');
+  list.innerHTML = '';
+  state.messages.forEach((msg, idx) => {
+    const div = document.createElement('div');
+    div.className = 'message-editor';
+    div.dataset.id = msg.id;
+    const limit = LIMITS[msg.plan];
+    const len = msg.text.length;
+    const counterClass = len > limit ? 'over' : len > limit * 0.9 ? 'warn' : '';
+    div.innerHTML = `
+      <div class="msg-header-row">
+        <input class="msg-name-input" type="text" placeholder="${escAttr(t('namePlaceholder'))}" value="${escAttr(msg.name)}" maxlength="32">
+        <input class="msg-color-input" type="color" value="${escAttr(msg.color)}" title="名前の色">
+        <button class="msg-ctrl-btn" data-action="up" title="上へ">${t('up')}</button>
+        <button class="msg-ctrl-btn" data-action="down" title="下へ">${t('down')}</button>
+        <button class="msg-ctrl-btn del" data-action="del" title="削除">${t('del')}</button>
+      </div>
+      <textarea class="msg-textarea" maxlength="${limit + 500}" placeholder="${escAttr(t('msgPlaceholder'))}">${escHtml(msg.text)}</textarea>
+      <div class="msg-footer-row">
+        <select class="plan-select">
+          <option value="free" ${msg.plan==='free'?'selected':''}>Free (2000)</option>
+          <option value="nitro" ${msg.plan==='nitro'?'selected':''}>Nitro (4000)</option>
+        </select>
+        <span class="char-counter ${counterClass}">${len} / ${limit}</span>
+      </div>`;
+
+    // Events
+    div.querySelector('.msg-name-input').addEventListener('input', e => {
+      msg.name = e.target.value;
+      renderPreview();
+    });
+    div.querySelector('.msg-color-input').addEventListener('input', e => {
+      msg.color = e.target.value;
+      renderPreview();
+    });
+    const ta = div.querySelector('.msg-textarea');
+    ta.addEventListener('input', e => {
+      msg.text = e.target.value;
+      updateCounter(div, msg);
+      autoGrowTextarea(e.target);
+      renderPreview();
+    });
+    div.querySelector('.plan-select').addEventListener('change', e => {
+      msg.plan = e.target.value;
+      updateCounter(div, msg);
+      renderPreview();
+    });
+    div.querySelector('[data-action=up]').addEventListener('click', () => moveMessage(msg.id, -1));
+    div.querySelector('[data-action=down]').addEventListener('click', () => moveMessage(msg.id, 1));
+    div.querySelector('[data-action=del]').addEventListener('click', () => removeMessage(msg.id));
+
+    list.appendChild(div);
+    // After insertion, measure with correct width and grow.
+    requestAnimationFrame(() => autoGrowTextarea(ta));
+  });
+}
+
+function updateCounter(editorDiv, msg) {
+  const limit = LIMITS[msg.plan];
+  const len = msg.text.length;
+  const span = editorDiv.querySelector('.char-counter');
+  span.textContent = `${len} / ${limit}`;
+  span.className = 'char-counter' + (len > limit ? ' over' : len > limit * 0.9 ? ' warn' : '');
+}
+
+// ---- Render preview ----
+let previewRenderCount = 0;
+
+function renderPreview() {
+  const container = document.getElementById('messages-container');
+  ++previewRenderCount;
+
+  if (state.messages.length === 0 || state.messages.every(m => !m.text.trim())) {
+    container.innerHTML = `<div class="preview-empty"><div class="preview-empty-icon">💬</div><div>メッセージを入力するとプレビューが表示されます</div></div>`;
+    return;
+  }
+
+  const ts = formatMsgTime();
+
+  // Render synchronously first (without OGP)
+  const fragments = state.messages
+    .filter(m => m.text.trim())
+    .map(msg => {
+      const { html, ogpUrls } = parseMarkdown(msg.text);
+      const initLetter = avatarInitial(msg.name);
+      const bgColor = msg.color && msg.color !== '#ffffff' ? avatarColor(msg.name) : avatarColor(msg.name);
+      return {
+        msg,
+        html,
+        ogpUrls: ogpEnabled ? ogpUrls : [],
+        initLetter,
+        bgColor: avatarColor(msg.name),
+        nameColor: msg.color,
+      };
+    });
+
+  container.innerHTML = fragments.map(f => `
+    <div class="dc-message" data-msg-id="${f.msg.id}">
+      <div class="dc-avatar" style="background:${escAttr(f.bgColor)}">${escHtml(f.initLetter)}</div>
+      <div class="dc-msg-content">
+        <div class="dc-msg-header">
+          <span class="dc-username" style="color:${escAttr(f.nameColor)}">${escHtml(f.msg.name || 'ユーザー')}</span>
+          <span class="dc-msg-ts">${escHtml(ts)}</span>
+        </div>
+        <div class="dc-msg-body">${f.html}</div>
+        <div class="ogp-container"></div>
+      </div>
+    </div>`).join('');
+
+  // Async OGP fetch
+  fragments.forEach((f) => {
+    if (!f.ogpUrls.length) return;
+    console.log('[OGP] URLs to fetch for msg', f.msg.id, ':', f.ogpUrls);
+    f.ogpUrls.forEach(async (url) => {
+      const ogp = await fetchOGP(url);
+      if (!ogp) { console.warn('[OGP] no result for', url); return; }
+      if (!f.msg.text.includes(url)) { console.debug('[OGP] URL removed from msg, skipping', url); return; }
+      const msgEl = container.querySelector(`[data-msg-id="${f.msg.id}"]`);
+      if (!msgEl) { console.warn('[OGP] msg element not found in DOM, id=', f.msg.id); return; }
+      const ogpContainer = msgEl.querySelector('.ogp-container');
+      if (!ogpContainer) { console.warn('[OGP] ogp-container not found'); return; }
+      if (ogpContainer.querySelector(`[data-ogp-url="${CSS.escape(url)}"]`)) { console.debug('[OGP] duplicate skipped', url); return; }
+      const card = document.createElement('div');
+      card.dataset.ogpUrl = url;
+      card.innerHTML = renderOGPCard(ogp, url);
+      ogpContainer.appendChild(card.firstElementChild || card);
+      console.log('[OGP] card appended for', url);
+    });
+  });
+}
+
+// ---- Channel header ----
+function updateChannelHeader() {
+  const name = document.getElementById('channel-name-input').value || 'general';
+  const showHeader = document.getElementById('toggle-header').checked;
+  const isAnnounce = document.getElementById('toggle-announce').checked;
+  const header = document.getElementById('channel-header');
+  const icon = document.getElementById('channel-icon');
+  const nameDisplay = document.getElementById('channel-name-display');
+  const badge = document.getElementById('announce-badge');
+
+  header.classList.toggle('hidden', !showHeader);
+  icon.textContent = isAnnounce ? '📢' : '#';
+  nameDisplay.textContent = name;
+  badge.classList.toggle('hidden', !isAnnounce);
+}
+
+// ---- Tabs ----
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+  });
+});
+
+// ---- Settings events ----
+document.getElementById('channel-name-input').addEventListener('input', updateChannelHeader);
+document.getElementById('toggle-header').addEventListener('change', updateChannelHeader);
+document.getElementById('toggle-announce').addEventListener('change', updateChannelHeader);
+document.getElementById('toggle-ogp').addEventListener('change', e => {
+  ogpEnabled = e.target.checked;
+  renderPreview();
+});
+document.getElementById('add-message-btn').addEventListener('click', addMessage);
+
+// ---- Timestamp tool ----
+function initTimestampTool() {
+  const tzSelect = document.getElementById('ts-timezone');
+
+  // Populate timezones
+  const tzList = [
+    'Asia/Tokyo', 'Asia/Seoul', 'Asia/Shanghai', 'Asia/Taipei', 'Asia/Singapore',
+    'Asia/Bangkok', 'Asia/Kolkata', 'Asia/Dubai', 'Asia/Jerusalem',
+    'Europe/Istanbul', 'Europe/Moscow', 'Europe/Helsinki', 'Europe/Stockholm',
+    'Europe/Berlin', 'Europe/Paris', 'Europe/Rome', 'Europe/Madrid',
+    'Europe/London', 'Atlantic/Reykjavik',
+    'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+    'America/Anchorage', 'Pacific/Honolulu',
+    'America/Sao_Paulo', 'America/Argentina/Buenos_Aires',
+    'Pacific/Auckland', 'Pacific/Fiji',
+    'UTC',
+  ];
+
+  tzList.forEach(tz => {
+    const opt = document.createElement('option');
+    opt.value = tz;
+    opt.textContent = tz;
+    if (tz === 'Asia/Tokyo') opt.selected = true;
+    tzSelect.appendChild(opt);
+  });
+
+  // Set current datetime
+  const nowBtn = document.getElementById('ts-now-btn');
+  const dtInput = document.getElementById('ts-datetime');
+
+  function setNow() {
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    dtInput.value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    updateTsFormats();
+  }
+  setNow();
+
+  nowBtn.addEventListener('click', setNow);
+  dtInput.addEventListener('input', updateTsFormats);
+  tzSelect.addEventListener('change', updateTsFormats);
+}
+
+function updateTsFormats() {
+  const dtInput = document.getElementById('ts-datetime');
+  const tzSelect = document.getElementById('ts-timezone');
+  const formatsDiv = document.getElementById('ts-formats');
+  const tz = tzSelect.value;
+  const dtVal = dtInput.value;
+  if (!dtVal) { formatsDiv.innerHTML = ''; return; }
+
+  // Parse local datetime in selected timezone
+  // We parse the datetime-local value as a moment in the selected timezone
+  let unix;
+  try {
+    // datetime-local gives YYYY-MM-DDTHH:MM (no tz info)
+    // We interpret it as being in the selected timezone
+    const [datePart, timePart] = dtVal.split('T');
+    const [y, mo, d] = datePart.split('-').map(Number);
+    const [h, mi] = timePart.split(':').map(Number);
+
+    // Use Intl to find the UTC offset for this datetime in the target timezone
+    // by formatting a reference date and computing offset
+    const localDate = new Date(Date.UTC(y, mo-1, d, h, mi));
+    // Get what time it is in the target timezone at this UTC time
+    const tzOffset = getTzOffsetMinutes(tz, localDate);
+    unix = Math.floor(localDate.getTime() / 1000) - tzOffset * 60;
+  } catch {
+    formatsDiv.innerHTML = `<div style="color:var(--red)">${escHtml(t('tsParseError'))}</div>`;
+    return;
+  }
+
+  const locale = lang === 'ja' ? 'ja-JP' : 'en-US';
+  const tsLabels = t('tsLabels');
+  const fmts = [
+    { key: 't', label: tsLabels.t, opts: { hour: '2-digit', minute: '2-digit', timeZone: tz } },
+    { key: 'T', label: tsLabels.T, opts: { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: tz } },
+    { key: 'd', label: tsLabels.d, opts: { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: tz } },
+    { key: 'D', label: tsLabels.D, opts: { year: 'numeric', month: 'long', day: 'numeric', timeZone: tz } },
+    { key: 'f', label: tsLabels.f, opts: { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: tz } },
+    { key: 'F', label: tsLabels.F, opts: { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: tz } },
+    { key: 'R', label: tsLabels.R, opts: null },
+  ];
+
+  formatsDiv.innerHTML = fmts.map(f => {
+    const code = f.key === 'f' ? `<t:${unix}>` : `<t:${unix}:${f.key}>`;
+    let preview;
+    if (f.key === 'R') {
+      preview = formatRelative(unix);
+    } else {
+      try { preview = new Intl.DateTimeFormat(locale, f.opts).format(new Date(unix * 1000)); }
+      catch { preview = '—'; }
+    }
+    return `<div class="ts-format-row">
+      <div class="ts-format-code">${escHtml(code)}</div>
+      <div class="ts-format-preview">${escHtml(preview)}</div>
+      <button class="ts-copy-btn" data-code="${escAttr(code)}" onclick="copyTs(this)">${escHtml(t('copy'))}</button>
+    </div>`;
+  }).join('');
+}
+
+function getTzOffsetMinutes(tz, utcDate) {
+  // Get offset of `tz` from UTC at a given UTC date
+  // by comparing what the formatter says vs UTC
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  });
+  const parts = fmt.formatToParts(utcDate);
+  const get = (t) => parseInt(parts.find(p => p.type === t).value);
+  const y = get('year'), mo = get('month'), d = get('day');
+  const h = get('hour') % 24, mi = get('minute'), s = get('second');
+  const localMs = Date.UTC(y, mo-1, d, h, mi, s);
+  return Math.round((localMs - utcDate.getTime()) / 60000);
+}
+
+function copyTs(btn) {
+  const code = btn.dataset.code;
+  const done = () => {
+    btn.classList.add('copied');
+    btn.textContent = t('copied');
+    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = t('copy'); }, 1500);
+  };
+  navigator.clipboard.writeText(code).then(done).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = code;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  });
+}
+
+// ---- Lang button ----
+function updateLangToggle() {
+  document.querySelectorAll('.lang-opt').forEach(el => {
+    el.classList.toggle('active', el.dataset.l === lang);
+  });
+}
+document.getElementById('lang-btn').addEventListener('click', () => {
+  lang = lang === 'ja' ? 'en' : 'ja';
+  document.documentElement.lang = lang;
+  updateLangToggle();
+  applyLang();
+  renderEditors();
+  renderPreview();
+});
+
+// ---- Init ----
+initColumnResizer();
+addMessage();
+initTimestampTool();
+updateChannelHeader();
+updateLangToggle();
+applyLang();
+</script>
+</body>
+</html>
